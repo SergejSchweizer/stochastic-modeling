@@ -3,11 +3,13 @@
 from pathlib import Path
 
 import nbformat
+from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "notebooks" / "MScFE622_GWP1.ipynb"
 README = ROOT / "README.md"
 HTML = ROOT / "outputs" / "MScFE622_GWP1.html"
+PDF = ROOT / "output" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
 
 
 def main() -> None:
@@ -26,6 +28,18 @@ def main() -> None:
     html_text = HTML.read_text(encoding="utf-8")
     for marker in ("from dataclasses", "def heston_cf", "differential_evolution"):
         assert marker not in html_text
+    pdf = PdfReader(PDF)
+    assert len(pdf.pages) >= 2
+    pdf_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    participants = [
+        "Umuhoza Denyse Graine",
+        "Opeyemi Waliyilah Oladipupo",
+        "Sergej Schweizer",
+    ]
+    positions = [pdf_text.index(participant) for participant in participants]
+    assert positions == sorted(positions)
+    assert pdf.metadata.title == "Stochastic Modeling Group Work Project 1"
+    assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
 
 
 if __name__ == "__main__":
