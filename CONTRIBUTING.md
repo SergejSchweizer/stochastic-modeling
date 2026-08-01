@@ -26,6 +26,7 @@ Regenerate and execute the deliverables before opening a pull request:
 .venv\Scripts\python.exe scripts\generate_coursework_notebook.py
 .venv\Scripts\jupyter.exe nbconvert --to notebook --execute --inplace notebooks\MScFE622_GWP1.ipynb --ExecutePreprocessor.timeout=1800
 .venv\Scripts\jupyter.exe nbconvert --to html --config notebooks\nbconvert_hide_input.py --output MScFE622_GWP1 --output-dir outputs notebooks\MScFE622_GWP1.ipynb
+.venv\Scripts\python.exe scripts\generate_pdf_report.py
 ```
 
 All changes reach `main` through a pull request. The protected branch accepts a merge only after the required `quality` check succeeds.
