@@ -96,19 +96,47 @@ nb.cells = [
 
         ## 1(a) Heston (1993) calibrated with the Lewis (2001) representation
 
-        Under the risk-neutral measure, the stock and instantaneous variance follow
+        Under the risk-neutral measure, the stock and instantaneous variance follow the Heston diffusion (Heston 327-343):
 
         \[
-        dS_t=rS_tdt+\sqrt{v_t}S_t dW_t^S,\qquad
-        dv_t=\kappa(\theta-v_t)dt+\sigma\sqrt{v_t}dW_t^v,
+        dS_t=rS_t\,dt+\sqrt{v_t}S_t\,dW_t^S. \tag{1}
         \]
 
-        with correlation \(\rho\). The parameter vector is \((\kappa,\theta,\sigma,\rho,v_0)\). Calls are evaluated through Lewis's Fourier integral and puts are obtained from put-call parity, \(P=C-S_0+Ke^{-rT}\).
+        \[
+        dv_t=\kappa(\theta-v_t)\,dt+\sigma\sqrt{v_t}\,dW_t^v. \tag{2}
+        \]
+
+        \[
+        dW_t^S\,dW_t^v=\rho\,dt. \tag{3}
+        \]
+
+        The parameter vector is \((\kappa,\theta,\sigma,\rho,v_0)\). Define the characteristic function of the log return as
+
+        \[
+        \varphi_T(z)=\mathbb{E}^{\mathbb{Q}}\!\left[e^{iz\log(S_T/S_0)}\right]. \tag{4}
+        \]
+
+        The Lewis representation used for calls is (Lewis):
+
+        \[
+        C_0=S_0-\frac{e^{-rT}\sqrt{S_0K}}{\pi}
+        \int_0^{\infty}\operatorname{Re}\!\left[
+        \frac{e^{iu\log(S_0/K)}\varphi_T(u-i/2)}{u^2+1/4}
+        \right]du. \tag{5}
+        \]
+
+        Puts are obtained through the preferred parity relation specified in the project brief (WorldQuant University 1-2):
+
+        \[
+        P_0=C_0-S_0+Ke^{-rT}. \tag{6}
+        \]
 
         The calibration uses all five 15-day calls and all five 15-day puts with the requested unweighted dollar-price MSE:
 
         \[
-        \mathrm{MSE}=\frac{1}{N}\sum_{i=1}^{N}(V_i^{model}-V_i^{market})^2,\qquad N=10.
+        \operatorname{MSE}(\Theta)=\frac{1}{N}\sum_{i=1}^{N}
+        \left(V_i^{\mathrm{model}}(\Theta)-V_i^{\mathrm{market}}\right)^2,
+        \qquad N=10. \tag{7}
         \]
         """
     ),
@@ -161,14 +189,27 @@ nb.cells = [
         """
     ),
     markdown(
-        """
+        r"""
         ### Step 1(a) interpretation
 
         The reported result is the minimum of the regular price-MSE objective, using only the 15-day options. The parity diagnostic is essential: the input calls and puts are not mutually arbitrage-consistent at the stated spot and rate, so a model that derives puts by parity cannot fit both sides exactly. Short-maturity data also carry weak information about the long-run variance level and its mean-reversion speed. Parameter values at bounds or a failed Feller diagnostic should therefore be discussed as identification limitations, rather than interpreted as a forecast of long-run variance.
 
         ## 1(b) Heston calibrated with Carr-Madan (1999)
 
-        Carr-Madan prices the same characteristic function through a damped Fourier transform. The same 15-day observations, parameter bounds, regular MSE, and put-call parity convention are used. Agreement in fitted prices and MSE is the primary comparison; exact agreement in individual parameters is not guaranteed because the objective is shallow in poorly identified short-dated directions.
+        Carr-Madan prices the same characteristic function through a damped Fourier transform (Carr and Madan 61-73). For damping parameter \(\alpha>0\), the transformed call value is
+
+        \[
+        \psi_T(v)=\frac{e^{-rT}\,\phi_{\log S_T}\!\left(v-(\alpha+1)i\right)}
+        {\alpha^2+\alpha-v^2+i(2\alpha+1)v}. \tag{8}
+        \]
+
+        \[
+        C_0(K,T)=\frac{e^{-\alpha\log K}}{\pi}
+        \int_0^{\infty}\operatorname{Re}\!\left[
+        e^{-iv\log K}\psi_T(v)\right]dv. \tag{9}
+        \]
+
+        The same 15-day observations, parameter bounds, regular MSE, and put-call parity convention are used. Agreement in fitted prices and MSE is the primary comparison; exact agreement in individual parameters is not guaranteed because the objective is shallow in poorly identified short-dated directions.
         """
     ),
     code(
@@ -195,10 +236,30 @@ nb.cells = [
         """
     ),
     markdown(
-        """
+        r"""
         ## 1(c) Twenty-day ATM Asian call
 
-        The client requests an arithmetic-average Asian call with 20 trading days to maturity and strike equal to today’s spot. The current spot is included as the first observation in the average, as required. Risk-neutral full-truncation simulation is used for the Heston variance process. The number of paths is reported with the standard error and a 95% confidence interval; the final client price includes the stated 4% fee.
+        The client requests an arithmetic-average Asian call with 20 trading days to maturity and strike equal to today's spot. The current spot is included as the first observation in the average, as required by the project brief (WorldQuant University 1-2):
+
+        \[
+        A_T=\frac{1}{n+1}\sum_{j=0}^{n}S_{t_j},\qquad S_{t_0}=S_0. \tag{10}
+        \]
+
+        \[
+        \Pi_T=\max(A_T-K,0),\qquad K=S_0. \tag{11}
+        \]
+
+        The discounted Monte Carlo estimator is
+
+        \[
+        \widehat{V}_0=e^{-rT}\frac{1}{M}\sum_{m=1}^{M}\Pi_T^{(m)}. \tag{12}
+        \]
+
+        Risk-neutral full-truncation simulation is used for the Heston variance process. The number of paths is reported with the standard error and a 95% confidence interval. The final client quote applies the required fee:
+
+        \[
+        V_{\mathrm{client}}=1.04\,\widehat{V}_0. \tag{13}
+        \]
         """
     ),
     code(
@@ -224,7 +285,28 @@ nb.cells = [
 
         ## 2(a) Bates (1996) calibrated with Lewis (2001)
 
-        The Bates model augments the Heston process with a compound-Poisson jump component. Its additional parameters are jump intensity \(\lambda\), mean log-jump \(\mu_J\), and log-jump volatility \(\delta_J\). The compensator preserves risk-neutral expected growth. Calibration uses the ten 60-day call and put observations and the same regular MSE; puts again follow parity.
+        The Bates model augments the Heston process with a compound-Poisson jump component (Bates 69-107):
+
+        \[
+        \frac{dS_t}{S_{t^-}}=(r-\lambda\kappa_J)\,dt+\sqrt{v_t}\,dW_t^S
+        +(J-1)\,dN_t. \tag{14}
+        \]
+
+        For lognormal jump size \(J=e^Y\), where \(Y\) has mean \(\mu_J\) and standard deviation \(\delta_J\), the compensator is
+
+        \[
+        \kappa_J=\mathbb{E}[J-1]
+        =\exp\!\left(\mu_J+\frac{\delta_J^2}{2}\right)-1. \tag{15}
+        \]
+
+        The jump characteristic-function multiplier is
+
+        \[
+        \varphi_J(u)=\exp\!\left\{\lambda T
+        \left[\exp\!\left(iu\mu_J-\frac{1}{2}\delta_J^2u^2\right)-1-iu\kappa_J\right]\right\}. \tag{16}
+        \]
+
+        The additional parameters are jump intensity \(\lambda\), mean log-jump \(\mu_J\), and log-jump volatility \(\delta_J\). Calibration uses the ten 60-day call and put observations and the same regular MSE; puts again follow Equation (6).
         """
     ),
     code(
@@ -246,7 +328,7 @@ nb.cells = [
         """
         ## 2(b) Bates (1996) calibrated with Carr-Madan (1999)
 
-        This repeats the 60-day Bates calibration with the damped Carr-Madan transform. Any remaining difference from the Lewis result should be assessed against numerical integration tolerance and parameter identifiability, not simply judged by parameter equality.
+        This repeats the 60-day Bates calibration with the damped transform in Equations (8)-(9) (Carr and Madan 61-73). Any remaining difference from the Lewis result should be assessed against numerical integration tolerance and parameter identifiability, not simply judged by parameter equality.
         """
     ),
     code(
@@ -271,7 +353,13 @@ nb.cells = [
         r"""
         ## 2(c) Seventy-day, 95% moneyness vanilla put
 
-        The strike is \(0.95S_0\). The fair value uses the selected 60-day Bates calibration as the nearest available market-informed specification, extended to the required 70-day maturity. The same 4% fee convention is applied to produce a client price.
+        The required strike is 95% of the current stock price (WorldQuant University 3):
+
+        \[
+        K=0.95S_0=0.95(232.90)=221.255. \tag{17}
+        \]
+
+        The fair value uses the selected 60-day Bates calibration as the nearest available market-informed specification, extended to the required 70-day maturity. The same 4% fee convention from Equation (13) is applied to produce a client price.
         """
     ),
     code(
@@ -288,13 +376,40 @@ nb.cells = [
 
         ## 3(a) CIR (1985) calibration to the Euribor term structure
 
-        The supplied annualized Euribor observations are: 1 week 0.648%, 1 month 0.679%, 3 months 1.173%, 6 months 1.809%, and 12 months 2.556%. A cubic spline interpolates weekly annualized zero rates across one year. The CIR short-rate dynamics are
+        The supplied annualized Euribor observations are: 1 week 0.648%, 1 month 0.679%, 3 months 1.173%, 6 months 1.809%, and 12 months 2.556%. A cubic spline interpolates weekly annualized zero rates across one year, as required by the project brief (WorldQuant University 3-4). The CIR short-rate dynamics are (Cox, Ingersoll, and Ross 385-407):
 
         \[
-        dr_t=a(b-r_t)dt+\eta\sqrt{r_t}dW_t.
+        dr_t=a(b-r_t)\,dt+\eta\sqrt{r_t}\,dW_t. \tag{18}
         \]
 
-        The CIR zero-coupon bond formula yields model zero rates, and parameters \((a,b,\eta)\) are selected by least squares against the interpolated weekly curve. Negative spline values are clipped at zero because rates are modeled as non-negative in CIR.
+        The CIR zero-coupon bond value and coefficients are
+
+        \[
+        P(0,T)=A(T)\exp[-B(T)r_0]. \tag{19}
+        \]
+
+        \[
+        B(T)=\frac{2(e^{\gamma T}-1)}{(\gamma+a)(e^{\gamma T}-1)+2\gamma}. \tag{20}
+        \]
+
+        \[
+        A(T)=\left[
+        \frac{2\gamma\exp((a+\gamma)T/2)}
+        {(\gamma+a)(e^{\gamma T}-1)+2\gamma}
+        \right]^{2ab/\eta^2}. \tag{21}
+        \]
+
+        \[
+        \gamma=\sqrt{a^2+2\eta^2}. \tag{22}
+        \]
+
+        The continuously compounded model zero rate is
+
+        \[
+        R(0,T)=-\frac{\log P(0,T)}{T}. \tag{23}
+        \]
+
+        Parameters \((a,b,\eta)\) are selected by least squares against the interpolated weekly curve. Negative spline values are clipped at zero because rates are modeled as non-negative in CIR.
         """
     ),
     code(
@@ -316,10 +431,23 @@ nb.cells = [
         """
     ),
     markdown(
-        """
+        r"""
         ## 3(b) One-year daily CIR simulation
 
-        One hundred thousand risk-neutral daily paths are simulated for one year using full truncation. The selected confidence level is 95%; the reported interval is the 2.5th to 97.5th percentile range of the simulated 12-month Euribor rate. The expected terminal rate is compared with the current 12-month Euribor rate. A higher expected rate increases discounting of future cash flows and, holding other inputs fixed, lowers present values of long-dated positive cash flows.
+        One hundred thousand risk-neutral daily paths are simulated for one year using full truncation (WorldQuant University 4). The selected confidence level is 95%; the reported range is
+
+        \[
+        \left[Q_{0.025}(r_{1\mathrm{y}}),\,Q_{0.975}(r_{1\mathrm{y}})\right]. \tag{24}
+        \]
+
+        The expected terminal 12-month rate is estimated by the sample mean:
+
+        \[
+        \widehat{\mathbb{E}}[r_{1\mathrm{y}}]
+        =\frac{1}{M}\sum_{m=1}^{M}r_{1\mathrm{y}}^{(m)},\qquad M=100{,}000. \tag{25}
+        \]
+
+        The expected terminal rate is compared with the current 12-month Euribor rate. A higher expected rate increases discounting of future cash flows and, holding other inputs fixed, lowers present values of long-dated positive cash flows.
         """
     ),
     code(
@@ -341,17 +469,19 @@ nb.cells = [
         - The 60-day Bates exercise allows occasional discontinuous moves and is used for the 70-day put as the closest maturity-specific market calibration.
         - The CIR analysis translates the Euribor curve into a one-year distribution of rates. The expected terminal rate and its 95% range support pricing and risk discussions for longer-dated products.
 
-        ## References
+        ## Works Cited
 
-        Bates, D. S. (1996). *Jumps and stochastic volatility: Exchange rate processes implicit in Deutsche Mark options.* Review of Financial Studies.
+        Bates, David S. "Jumps and Stochastic Volatility: Exchange Rate Processes Implicit in Deutsche Mark Options." *The Review of Financial Studies*, vol. 9, no. 1, 1996, pp. 69-107. [doi:10.1093/rfs/9.1.69](https://doi.org/10.1093/rfs/9.1.69).
 
-        Carr, P., & Madan, D. (1999). *Option valuation using the fast Fourier transform.* Journal of Computational Finance.
+        Carr, Peter, and Dilip B. Madan. "Option Valuation Using the Fast Fourier Transform." *The Journal of Computational Finance*, vol. 2, no. 4, 1999, pp. 61-73.
 
-        Cox, J. C., Ingersoll, J. E., & Ross, S. A. (1985). *A theory of the term structure of interest rates.* Econometrica.
+        Cox, John C., Jonathan E. Ingersoll, Jr., and Stephen A. Ross. "A Theory of the Term Structure of Interest Rates." *Econometrica*, vol. 53, no. 2, 1985, pp. 385-407. [doi:10.2307/1911242](https://doi.org/10.2307/1911242).
 
-        Heston, S. L. (1993). *A closed-form solution for options with stochastic volatility with applications to bond and currency options.* Review of Financial Studies.
+        Heston, Steven L. "A Closed-Form Solution for Options with Stochastic Volatility with Applications to Bond and Currency Options." *The Review of Financial Studies*, vol. 6, no. 2, 1993, pp. 327-343. [doi:10.1093/rfs/6.2.327](https://doi.org/10.1093/rfs/6.2.327).
 
-        Lewis, A. L. (2001). *A simple option formula for general jump-diffusion and other exponential Levy processes.*
+        Lewis, Alan L. "A Simple Option Formula for General Jump-Diffusion and Other Exponential Levy Processes." *SSRN*, 2001, [ssrn.com/abstract=282110](https://ssrn.com/abstract=282110).
+
+        WorldQuant University. *MScFE 622 Stochastic Modeling: Group Work Project 1*. 2022. Course handout.
 
         # Step 4 - Submission checklist
 
@@ -366,19 +496,25 @@ nb.cells = [
             "## Executive summary", "",
             f"This companion presents the assumptions, results, interpretations, and figures for all project questions. SM Energy spot is ${SPOT:.2f}; the annual risk-free rate is {RATE:.2%}; one year is {DAYS_PER_YEAR} trading days; and no dividend yield is assumed.", "",
             "## Step 1 - 15-day derivative", "", "### 1(a) Heston calibration using Lewis (2001)", "",
-            f"The 15-day calls and puts were fitted jointly using unweighted USD price MSE. The fitted parameters are kappa={m(heston_15.kappa)}, theta={m(heston_15.theta)}, sigma={m(heston_15.sigma)}, rho={m(heston_15.rho)}, and initial variance={m(heston_15.v0)}. MSE is {m(mse_15)} and RMSE is ${m(np.sqrt(mse_15))}.", "",
+            f"The 15-day calls and puts were fitted jointly using the Heston specification and Lewis representation (Heston 327-343; Lewis), with unweighted USD price MSE as required by the project brief (WorldQuant University 1-2). The fitted parameters are kappa={m(heston_15.kappa)}, theta={m(heston_15.theta)}, sigma={m(heston_15.sigma)}, rho={m(heston_15.rho)}, and initial variance={m(heston_15.v0)}. MSE is {m(mse_15)} and RMSE is ${m(np.sqrt(mse_15))}.", "",
             f"The input quotes have a put-call parity RMSE of ${m(np.sqrt(np.mean(parity_gap**2)))}; an arbitrage-consistent fit cannot make all residuals zero. Short maturity also weakens identification of long-run variance and mean reversion.", "",
             "![15-day market and model prices](outputs/figures/step1a_market_vs_model.png)", "", "![15-day residuals](outputs/figures/step1a_residuals.png)", "",
-            "### 1(b) Carr-Madan comparison", "", f"The Carr-Madan MSE is {m(mse_cm_15)}, compared with {m(mse_15)} for Lewis. Fitted prices and numerical stability are the meaningful comparison.", "", "![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)", "",
-            "### 1(c) 20-day ATM Asian call", "", f"Today's spot is included in the arithmetic average. Across {len(asian_samples):,} risk-neutral scenarios, fair value is ${m(asian_fair)} (standard error ${m(asian_se)}), with a 95% estimator interval of ${m(asian_fair-1.96*asian_se)} to ${m(asian_fair+1.96*asian_se)}. The 4% fee produces a client price of ${m(asian_client)}.", "",
+            "### 1(b) Carr-Madan comparison", "", f"The damped transform follows Carr and Madan (61-73). Its MSE is {m(mse_cm_15)}, compared with {m(mse_15)} for Lewis. Fitted prices and numerical stability are the meaningful comparison.", "", "![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)", "",
+            "### 1(c) 20-day ATM Asian call", "", f"Today's spot is included in the arithmetic average, following the project instructions (WorldQuant University 1-2). Across {len(asian_samples):,} risk-neutral scenarios, fair value is ${m(asian_fair)} (standard error ${m(asian_se)}), with a 95% estimator interval of ${m(asian_fair-1.96*asian_se)} to ${m(asian_fair+1.96*asian_se)}. The 4% fee produces a client price of ${m(asian_client)}.", "",
             "![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)", "",
-            "## Step 2 - 60-day derivative", "", "### 2(a) Bates calibration using Lewis", "", f"The 60-day Bates calibration has MSE {m(mse_bates_lewis)} and RMSE ${m(np.sqrt(mse_bates_lewis))}.", "", "![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)", "",
-            "### 2(b) Carr-Madan comparison", "", f"The matching Carr-Madan MSE is {m(mse_bates_cm)}. The comparison is based on fitted-price errors and numerical stability.", "", "![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)", "",
-            "### 2(c) 70-day 95%-moneyness put", "", f"The strike is ${0.95*SPOT:.2f}. Fair value is ${m(fair_put70)} and the price after the 4% fee is ${m(1.04*fair_put70)}.", "",
-            "## Step 3 - Euribor rates", "", "### 3(a) CIR calibration", "", f"The supplied curve contains 0.648% (1 week), 0.679% (1 month), 1.173% (3 months), 1.809% (6 months), and 2.556% (12 months). The fitted CIR values are a={m(cir[0])}, b={m(cir[1])}, eta={m(cir[2])}; MSE is {cir_objective(cir):.8f}.", "", "![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)", "",
-            "### 3(b) One-year rate scenarios", "", f"Across 100,000 daily scenarios, the expected terminal 12-month Euribor is {cir_terminal.mean():.4%}; the 95% range is {np.quantile(cir_terminal,.025):.4%} to {np.quantile(cir_terminal,.975):.4%}. Higher expected rates increase discounting of future positive cash flows and generally lower present values, all else equal.", "", "![Terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)", "",
+            "## Step 2 - 60-day derivative", "", "### 2(a) Bates calibration using Lewis", "", f"The 60-day jump-diffusion calibration follows Bates (69-107) and has MSE {m(mse_bates_lewis)} and RMSE ${m(np.sqrt(mse_bates_lewis))}.", "", "![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)", "",
+            "### 2(b) Carr-Madan comparison", "", f"The matching Carr-Madan calibration follows Carr and Madan (61-73) and has MSE {m(mse_bates_cm)}. The comparison is based on fitted-price errors and numerical stability.", "", "![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)", "",
+            "### 2(c) 70-day 95%-moneyness put", "", f"The project specifies a strike of 95% of spot (WorldQuant University 3), giving ${0.95*SPOT:.2f}. Fair value is ${m(fair_put70)} and the price after the 4% fee is ${m(1.04*fair_put70)}.", "",
+            "## Step 3 - Euribor rates", "", "### 3(a) CIR calibration", "", f"The supplied curve contains 0.648% (1 week), 0.679% (1 month), 1.173% (3 months), 1.809% (6 months), and 2.556% (12 months). Weekly interpolation follows the project brief (WorldQuant University 3-4), and the rate model follows Cox, Ingersoll, and Ross (385-407). The fitted values are a={m(cir[0])}, b={m(cir[1])}, eta={m(cir[2])}; MSE is {cir_objective(cir):.8f}.", "", "![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)", "",
+            "### 3(b) One-year rate scenarios", "", f"Following the required simulation size (WorldQuant University 4), 100,000 daily scenarios give an expected terminal 12-month Euribor of {cir_terminal.mean():.4%}; the 95% range is {np.quantile(cir_terminal,.025):.4%} to {np.quantile(cir_terminal,.975):.4%}. Higher expected rates increase discounting of future positive cash flows and generally lower present values, all else equal.", "", "![Terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)", "",
             "## Step 4 - Submission checklist", "", "The analytical material, figures, and references are organized for the required report and archive. The presentation export suppresses inputs while retaining explanations, tables, and figures.", "",
-            "## References", "", "- Bates (1996); Carr and Madan (1999); Cox, Ingersoll, and Ross (1985); Heston (1993); Lewis (2001).", "",
+            "## Works Cited", "",
+            '- Bates, David S. "Jumps and Stochastic Volatility: Exchange Rate Processes Implicit in Deutsche Mark Options." The Review of Financial Studies, vol. 9, no. 1, 1996, pp. 69-107. https://doi.org/10.1093/rfs/9.1.69.', "",
+            '- Carr, Peter, and Dilip B. Madan. "Option Valuation Using the Fast Fourier Transform." The Journal of Computational Finance, vol. 2, no. 4, 1999, pp. 61-73.', "",
+            '- Cox, John C., Jonathan E. Ingersoll, Jr., and Stephen A. Ross. "A Theory of the Term Structure of Interest Rates." Econometrica, vol. 53, no. 2, 1985, pp. 385-407. https://doi.org/10.2307/1911242.', "",
+            '- Heston, Steven L. "A Closed-Form Solution for Options with Stochastic Volatility with Applications to Bond and Currency Options." The Review of Financial Studies, vol. 6, no. 2, 1993, pp. 327-343. https://doi.org/10.1093/rfs/6.2.327.', "",
+            '- Lewis, Alan L. "A Simple Option Formula for General Jump-Diffusion and Other Exponential Levy Processes." SSRN, 2001, https://ssrn.com/abstract=282110.', "",
+            "- WorldQuant University. MScFE 622 Stochastic Modeling: Group Work Project 1. 2022. Course handout.", "",
         ]
         (ROOT / "README.md").write_text("\\n".join(readme_lines), encoding="utf-8")
         print("README.md refreshed with the current narrative and results.")
