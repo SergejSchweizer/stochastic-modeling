@@ -10,10 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "notebooks" / "MScFE622_GWP1.ipynb"
 README = ROOT / "README.md"
 HTML = ROOT / "outputs" / "MScFE622_GWP1.html"
-PDF = ROOT / "output" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
+PDF = ROOT / "outputs" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
 
 
 def main() -> None:
+    assert not (ROOT / "output").exists(), "legacy output directory must not exist"
     notebook = nbformat.read(NOTEBOOK, as_version=4)
     code_cells = [cell for cell in notebook.cells if cell.cell_type == "code"]
     markdown_text = "\n".join(
