@@ -2,10 +2,8 @@
 name: Import Lewis reference paper
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/import-lewis-paper.yml
+  issues:
+    types: [opened]
   workflow_dispatch:
 
 permissions:
@@ -13,10 +11,13 @@ permissions:
 
 jobs:
   import-paper:
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'chore: import Lewis reference paper'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download Lewis (2001) paper
         run: |
@@ -36,5 +37,5 @@ jobs:
             echo 'Paper already present; nothing to commit.'
           else
             git commit -m 'Add Lewis option-pricing reference paper'
-            git push
+            git push origin HEAD:main
           fi
