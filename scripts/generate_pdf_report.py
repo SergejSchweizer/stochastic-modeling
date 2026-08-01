@@ -26,7 +26,7 @@ from reportlab.platypus import (
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "docs" / "report-template.pdf"
 README = ROOT / "README.md"
-OUTPUT = ROOT / "output" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
+OUTPUT = ROOT / "outputs" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
 
 PARTICIPANTS = [
     ("Umuhoza Denyse Graine", "umuhozagraine2018@gmail.com"),
