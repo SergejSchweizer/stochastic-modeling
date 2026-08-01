@@ -1,5 +1,6 @@
 """Validate the checked-in notebook, narrative sidecar, and presentation export."""
 
+import re
 from pathlib import Path
 
 import nbformat
@@ -15,6 +16,9 @@ PDF = ROOT / "output" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
 def main() -> None:
     notebook = nbformat.read(NOTEBOOK, as_version=4)
     code_cells = [cell for cell in notebook.cells if cell.cell_type == "code"]
+    markdown_text = "\n".join(
+        cell.source for cell in notebook.cells if cell.cell_type == "markdown"
+    )
     assert code_cells, "notebook has no executable cells"
     assert all("hide-input" in cell.metadata.get("tags", []) for cell in code_cells)
     assert not [
@@ -23,8 +27,24 @@ def main() -> None:
         for output in cell.get("outputs", [])
         if output.output_type == "error"
     ]
+    display_equations = re.findall(r"\\\[(.*?)\\\]", markdown_text, flags=re.DOTALL)
+    assert display_equations, "notebook has no display equations"
+    assert all("\\tag{" in equation for equation in display_equations)
+    equation_numbers = [int(number) for number in re.findall(r"\\tag\{(\d+)\}", markdown_text)]
+    assert equation_numbers == list(range(1, 26))
+    assert not any(character in markdown_text for character in ("\a", "\b", "\f", "\v"))
+    for citation in (
+        "(Heston 327-343)",
+        "(Carr and Madan 61-73)",
+        "(Bates 69-107)",
+        "(Cox, Ingersoll, and Ross 385-407)",
+        "(WorldQuant University 1-2)",
+    ):
+        assert citation in markdown_text
+    assert "## Works Cited" in markdown_text
     readme_text = README.read_text(encoding="utf-8").lower()
     assert "code" not in readme_text and "notebook" not in readme_text
+    assert "## works cited" in readme_text
     html_text = HTML.read_text(encoding="utf-8")
     for marker in ("from dataclasses", "def heston_cf", "differential_evolution"):
         assert marker not in html_text

@@ -174,7 +174,7 @@ def _report_story():
         if line.startswith("## Step 4"):
             skipping_submission = True
             continue
-        if line.startswith("## References"):
+        if line.startswith(("## References", "## Works Cited")):
             skipping_submission = False
         if skipping_submission or not line:
             continue
