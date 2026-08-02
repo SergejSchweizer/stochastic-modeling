@@ -1,4 +1,5 @@
 import ast
+import re
 import subprocess
 from pathlib import Path
 
@@ -48,5 +49,9 @@ def test_notebook_has_eight_point_equation_and_plot_annotations():
     ]
 
     assert "font-size: 8pt !important" in markdown
+    equations = re.findall(r"\$\$(.*?)\$\$", markdown, flags=re.DOTALL)
+    assert len(equations) == 25
+    assert all(r"\tag{" in equation for equation in equations)
+    assert r"\[" not in markdown and r"\]" not in markdown
     assert len(descriptions) == 8
     assert all("font-size: 8pt !important" in description for description in descriptions)
