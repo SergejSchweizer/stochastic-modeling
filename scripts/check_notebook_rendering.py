@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "outputs" / "MScFE622_GWP1.html"
 EXPECTED_EQUATIONS = [f"({number})" for number in range(1, 26)]
-EXPECTED_PLOT_DESCRIPTIONS = 8
+EXPECTED_PLOT_DESCRIPTIONS = 9
 EQUATION_LABEL_POINTS_IN_PIXELS = 8 * 96 / 72
 PLOT_DESCRIPTION_POINTS_IN_PIXELS = 8 * 96 / 72
 NORMAL_TEXT_POINTS_IN_PIXELS = 10 * 96 / 72
@@ -67,6 +67,16 @@ def main() -> None:
         assert all(images.nth(index).get_attribute("alt") for index in range(images.count()))
         assert _all_have_font_size(labels, EQUATION_LABEL_POINTS_IN_PIXELS)
         assert _all_have_font_size(descriptions, PLOT_DESCRIPTION_POINTS_IN_PIXELS)
+        assert all(
+            descriptions.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            == "center"
+            for index in range(descriptions.count())
+        )
+        assert all(
+            descriptions.nth(index).evaluate("element => getComputedStyle(element).textAlignLast")
+            == "center"
+            for index in range(descriptions.count())
+        )
         assert paragraphs.count() > 0
         assert _all_have_font_size(paragraphs, NORMAL_TEXT_POINTS_IN_PIXELS)
         assert list_items.count() > 0

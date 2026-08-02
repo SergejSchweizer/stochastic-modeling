@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from IPython.display import HTML, Markdown, display
+from matplotlib.collections import LineCollection
 
 from stochastic_modeling import (
     CalibrationService,
@@ -323,7 +324,9 @@ def show_heston_carr_madan_calibration() -> None:
 def show_asian_call_valuation() -> None:
     """Price and display the 20-day arithmetic-average Asian call."""
     context = _context()
-    context.asian_samples = simulate_heston_asian(context.heston_15)
+    context.asian_samples, context.asian_paths = simulate_heston_asian(
+        context.heston_15, return_paths=True
+    )
     estimate = estimate_asian_call(context.asian_samples)
     context.asian_fair = estimate.fair_value
     context.asian_se = estimate.standard_error
@@ -341,6 +344,36 @@ def show_asian_call_valuation() -> None:
                 }
             ]
         ).round(4)
+    )
+    path_days = np.arange(context.asian_paths.shape[0])
+    path_segments = np.stack(
+        (
+            np.broadcast_to(path_days, context.asian_paths.T.shape),
+            context.asian_paths.T,
+        ),
+        axis=-1,
+    )
+    figure, axis = plt.subplots(figsize=(9, 4.8))
+    axis.add_collection(
+        LineCollection(
+            path_segments,
+            colors="#4C78A8",
+            linewidths=0.08,
+            alpha=0.01,
+            rasterized=True,
+        )
+    )
+    axis.set(
+        xlim=(path_days[0], path_days[-1]),
+        ylim=(context.asian_paths.min(), context.asian_paths.max()),
+        xlabel="Trading day",
+        ylabel="SM Energy price (USD)",
+        title="Step 1(c): all 200,000 simulated Heston price paths",
+    )
+    _save_figure(
+        "step1c_asian_paths.png",
+        "All 200,000 simulated SM Energy paths are shown from today's spot through the "
+        "20-day Asian-option horizon; darker regions indicate greater path concentration.",
     )
     plt.figure(figsize=(8, 4.2))
     plt.hist(context.asian_samples, bins=70, color="#4C78A8", alpha=0.85)
@@ -360,7 +393,9 @@ def show_asian_call_valuation() -> None:
         f"error is ${context.asian_se:.4f}, or {context.asian_se / context.asian_fair:.2%} of "
         f"the estimate. The 95% Monte Carlo interval of ${estimate.confidence_low:.4f} to "
         f"${estimate.confidence_high:.4f} is narrow enough that simulation noise is immaterial "
-        "relative to calibration and model risk. The payoff histogram is right-skewed and "
+        "relative to calibration and model risk. The path plot shows every simulated daily "
+        "trajectory, with the darkest region indicating the outcomes generated most often. "
+        "The payoff histogram is right-skewed and "
         "contains many zero or small outcomes because the call pays only when the arithmetic "
         "average exceeds the strike. The vertical line is the probability-weighted mean of "
         "those outcomes, not the most likely realized payoff.",
@@ -746,6 +781,8 @@ def refresh_narrative_sidecar() -> None:
         f"Today's spot is included in the arithmetic average, following the project instructions (WorldQuant University 1-2). Across {len(context.asian_samples):,} risk-neutral scenarios, fair value is ${metric(context.asian_fair)} (standard error ${metric(context.asian_se)}), with a 95% estimator interval of ${metric(context.asian_fair - 1.96 * context.asian_se)} to ${metric(context.asian_fair + 1.96 * context.asian_se)}. The 4% fee produces a client price of ${metric(context.asian_client)}.",
         "",
         f"The standard error is {context.asian_se / context.asian_fair:.2%} of fair value, so simulation noise is small relative to calibration risk. The interval measures estimator precision and is not a guaranteed payoff range for the client.",
+        "",
+        "![All simulated Asian-call paths](outputs/figures/step1c_asian_paths.png)",
         "",
         "![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)",
         "",

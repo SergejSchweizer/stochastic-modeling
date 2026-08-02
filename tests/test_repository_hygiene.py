@@ -53,9 +53,9 @@ def test_notebook_has_numbered_eight_point_equation_and_plot_annotations():
     assert len(equations) == 25
     assert all(r"\tag{" in equation for equation in equations)
     assert r"\[" not in markdown and r"\]" not in markdown
-    assert len(descriptions) == 8
+    assert len(descriptions) == 9
     assert all("font-size: 8pt !important" in description for description in descriptions)
     assert [
         re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
         for description in descriptions
-    ] == [str(number) for number in range(1, 9)]
+    ] == [str(number) for number in range(1, 10)]

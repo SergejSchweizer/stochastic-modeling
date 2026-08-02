@@ -113,13 +113,13 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
 .jp-RenderedHTMLCommon [id^="mjx-eqn"] {
     font-size: 8pt !important;
 }
-.plot-description {
+.jp-RenderedHTMLCommon p.plot-description {
     font-size: 8pt !important;
   line-height: 1.3;
   color: #444;
   margin: 0.25rem 0 1rem;
-    text-align: center;
-    text-align-last: center;
+        text-align: center !important;
+        text-align-last: center !important;
 }
 </style>
 <!-- NOTEBOOK_THEME_END -->"""
