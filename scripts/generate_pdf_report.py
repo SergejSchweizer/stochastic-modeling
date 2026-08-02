@@ -190,7 +190,7 @@ def _report_story():
             story.append(Paragraph(escape(line[3:]), styles["Section"]))
             continue
         if line.startswith("### "):
-            if line.startswith("### 3(b)"):
+            if line.startswith("### 3(ii)"):
                 story.append(PageBreak())
             story.append(Paragraph(escape(line[4:]), styles["Question"]))
             continue
