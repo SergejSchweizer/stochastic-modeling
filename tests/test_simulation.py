@@ -22,6 +22,14 @@ def test_asian_simulation_is_reproducible_and_summarized():
         estimate.client_price(-0.1)
 
 
+def test_asian_simulation_can_return_all_paths():
+    model = HestonParameters(2.0, 0.04, 0.3, -0.7, 0.04)
+    payoffs, spot_paths = simulate_heston_asian(model, days=3, paths=500, seed=1, return_paths=True)
+    assert spot_paths.shape == (4, 500)
+    assert np.all(spot_paths[0] == 232.90)
+    assert np.array_equal(payoffs, simulate_heston_asian(model, days=3, paths=500, seed=1))
+
+
 def test_asian_validation():
     model = HestonParameters(2.0, 0.04, 0.3, -0.7, 0.04)
     with pytest.raises(ValueError, match="days must be positive"):

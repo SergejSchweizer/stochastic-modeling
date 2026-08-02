@@ -1,6 +1,7 @@
 """Risk-neutral Monte Carlo engines and summary values."""
 
 from dataclasses import dataclass
+from typing import Literal, overload
 
 import numpy as np
 
@@ -22,14 +23,40 @@ class MonteCarloEstimate:
         return self.fair_value * (1 + fee)
 
 
+@overload
 def simulate_heston_asian(
     model: HestonParameters,
     days: int = 20,
     paths: int = 200_000,
     seed: int = 624,
     market: MarketConfig = DEFAULT_MARKET,
-) -> np.ndarray:
-    """Simulate discounted arithmetic-average ATM Asian call payoffs."""
+    *,
+    return_paths: Literal[False] = False,
+) -> np.ndarray: ...
+
+
+@overload
+def simulate_heston_asian(
+    model: HestonParameters,
+    days: int = 20,
+    paths: int = 200_000,
+    seed: int = 624,
+    market: MarketConfig = DEFAULT_MARKET,
+    *,
+    return_paths: Literal[True],
+) -> tuple[np.ndarray, np.ndarray]: ...
+
+
+def simulate_heston_asian(
+    model: HestonParameters,
+    days: int = 20,
+    paths: int = 200_000,
+    seed: int = 624,
+    market: MarketConfig = DEFAULT_MARKET,
+    *,
+    return_paths: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Simulate discounted arithmetic-average ATM Asian call payoffs and optional paths."""
     if days <= 0 or paths <= 1:
         raise ValueError("days must be positive and paths must exceed one")
     rng = np.random.default_rng(seed)
@@ -37,8 +64,11 @@ def simulate_heston_asian(
     log_spot = np.full(paths, np.log(market.spot))
     variance = np.full(paths, model.v0)
     running_sum = np.full(paths, market.spot)
+    spot_paths = np.empty((days + 1, paths)) if return_paths else None
+    if spot_paths is not None:
+        spot_paths[0] = market.spot
     orthogonal_scale = np.sqrt(1 - model.rho**2)
-    for _ in range(days):
+    for day in range(days):
         stock_shock, independent_shock = rng.standard_normal((2, paths))
         variance_shock = model.rho * stock_shock + orthogonal_scale * independent_shock
         positive_variance = np.maximum(variance, 0)
@@ -49,9 +79,15 @@ def simulate_heston_asian(
             model.kappa * (model.theta - positive_variance) * dt
             + model.sigma * np.sqrt(positive_variance * dt) * variance_shock
         )
-        running_sum += np.exp(log_spot)
+        current_spot = np.exp(log_spot)
+        running_sum += current_spot
+        if spot_paths is not None:
+            spot_paths[day + 1] = current_spot
     payoff = np.maximum(running_sum / (days + 1) - market.spot, 0)
-    return np.exp(-market.rate * market.year_fraction(days)) * payoff
+    discounted_payoff = np.exp(-market.rate * market.year_fraction(days)) * payoff
+    if spot_paths is not None:
+        return discounted_payoff, spot_paths
+    return discounted_payoff
 
 
 def estimate_asian_call(samples: np.ndarray, confidence: float = 0.95) -> MonteCarloEstimate:
