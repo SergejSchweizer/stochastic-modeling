@@ -49,6 +49,29 @@ def main() -> None:
     equation_numbers = [int(number) for number in re.findall(r"\\tag\{(\d+)\}", markdown_text)]
     assert equation_numbers == list(range(1, 26))
     assert not any(character in markdown_text for character in ("\a", "\b", "\f", "\v"))
+    assert "font-size: 8pt !important" in markdown_text
+    for explanation_label in (
+        "**Heston model purpose.**",
+        "**Lewis representation purpose.**",
+        "**Carr-Madan method purpose.**",
+        "**Asian valuation purpose.**",
+        "**Bates model purpose.**",
+        "**Bates-Carr-Madan purpose.**",
+        "**Put-pricing purpose.**",
+        "**CIR model purpose.**",
+        "**CIR simulation purpose.**",
+    ):
+        assert explanation_label in markdown_text
+    plot_descriptions = [
+        output.data["text/html"]
+        for cell in code_cells
+        for output in cell.get("outputs", [])
+        if output.output_type in ("display_data", "execute_result")
+        and "text/html" in output.data
+        and "plot-description" in output.data["text/html"]
+    ]
+    assert len(plot_descriptions) == 8
+    assert all("font-size: 8pt !important" in description for description in plot_descriptions)
     for citation in (
         "(Heston 327-343)",
         "(Carr and Madan 61-73)",
@@ -62,6 +85,7 @@ def main() -> None:
     assert "code" not in readme_text and "notebook" not in readme_text
     assert "## works cited" in readme_text
     html_text = HTML.read_text(encoding="utf-8")
+    assert html_text.count("plot-description") >= 8
     for marker in ("from dataclasses", "def heston_cf", "differential_evolution"):
         assert marker not in html_text
     pdf = PdfReader(PDF)

@@ -7,6 +7,7 @@ reproducible, testable project implementation outside the presentation layer.
 
 import warnings
 from dataclasses import asdict
+from html import escape
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from IPython.display import display
+from IPython.display import HTML, display
 
 from stochastic_modeling import (
     CalibrationService,
@@ -39,11 +40,17 @@ def _context() -> SimpleNamespace:
     return _WORKFLOW
 
 
-def _save_figure(name: str) -> None:
+def _save_figure(name: str, description: str) -> None:
     context = _context()
     plt.tight_layout()
     plt.savefig(context.figure_dir / name, dpi=180, bbox_inches="tight")
     plt.show()
+    display(
+        HTML(
+            '<p class="plot-description" style="font-size: 8pt !important;">'
+            f"<strong>Plot description.</strong> {escape(description)}</p>"
+        )
+    )
 
 
 def _prices(frame: pd.DataFrame, model, method: str = "lewis") -> np.ndarray:
@@ -169,7 +176,11 @@ def show_heston_lewis_fit() -> None:
         axis.plot(data.strike, data.model, "-", lw=2, label="Heston-Lewis")
         axis.set(title=f"15-day {name}", xlabel="Strike", ylabel="Option price (USD)")
         axis.legend()
-    _save_figure("step1a_market_vs_model.png")
+    _save_figure(
+        "step1a_market_vs_model.png",
+        "Market quotes are shown as points and Heston-Lewis fitted prices as curves; their "
+        "distance shows the quality of the joint call-and-put calibration.",
+    )
 
     plt.figure(figsize=(8, 4.2))
     sns.barplot(
@@ -183,7 +194,11 @@ def show_heston_lewis_fit() -> None:
     plt.title("Step 1(a): pricing residuals")
     plt.xlabel("Strike")
     plt.ylabel("Model - market (USD)")
-    _save_figure("step1a_residuals.png")
+    _save_figure(
+        "step1a_residuals.png",
+        "Signed pricing errors by strike and option type reveal where the calibrated model "
+        "overprices or underprices the observed 15-day contracts.",
+    )
 
 
 def show_heston_carr_madan_calibration() -> None:
@@ -239,7 +254,11 @@ def show_heston_carr_madan_calibration() -> None:
             ylabel="Option price (USD)",
         )
         axis.legend()
-    _save_figure("step1b_carr_madan_fit.png")
+    _save_figure(
+        "step1b_carr_madan_fit.png",
+        "The Carr-Madan calibration is compared with the same 15-day market quotes to verify "
+        "the alternative Fourier pricing route.",
+    )
 
 
 def show_asian_call_valuation() -> None:
@@ -271,7 +290,11 @@ def show_asian_call_valuation() -> None:
     plt.xlabel("Discounted payoff (USD)")
     plt.ylabel("Frequency")
     plt.legend()
-    _save_figure("step1c_asian_distribution.png")
+    _save_figure(
+        "step1c_asian_distribution.png",
+        "The histogram shows simulated discounted Asian-call payoffs; the vertical line marks "
+        "their mean, which is the estimated fair value.",
+    )
 
 
 def show_bates_lewis_calibration() -> None:
@@ -309,7 +332,11 @@ def show_bates_lewis_calibration() -> None:
             ylabel="Option price (USD)",
         )
         axis.legend()
-    _save_figure("step2a_market_vs_model.png")
+    _save_figure(
+        "step2a_market_vs_model.png",
+        "Observed 60-day option prices are compared with Bates-Lewis values, showing the fit "
+        "after jump risk is added to stochastic volatility.",
+    )
 
 
 def show_bates_carr_madan_calibration() -> None:
@@ -348,7 +375,11 @@ def show_bates_carr_madan_calibration() -> None:
             ylabel="Option price (USD)",
         )
         axis.legend()
-    _save_figure("step2b_carr_madan_fit.png")
+    _save_figure(
+        "step2b_carr_madan_fit.png",
+        "The Bates-Carr-Madan curves are plotted against the 60-day quotes as a numerical "
+        "cross-check of the Lewis-based calibration.",
+    )
 
 
 def show_seventy_day_put_valuation() -> None:
@@ -422,7 +453,11 @@ def show_cir_calibration() -> None:
     plt.ylabel("Annualized zero rate (%)")
     plt.title("Step 3(a): Euribor term structure and CIR fit")
     plt.legend()
-    _save_figure("step3a_cir_curve.png")
+    _save_figure(
+        "step3a_cir_curve.png",
+        "Supplied Euribor tenors, the weekly interpolated curve, and the fitted CIR curve show "
+        "how closely the rate model reproduces the observed term structure.",
+    )
 
 
 def show_cir_scenarios() -> None:
@@ -453,7 +488,11 @@ def show_cir_scenarios() -> None:
     plt.ylabel("Frequency")
     plt.title("Step 3(b): 100,000 simulated terminal Euribor rates")
     plt.legend()
-    _save_figure("step3b_cir_distribution.png")
+    _save_figure(
+        "step3b_cir_distribution.png",
+        "The histogram summarizes 100,000 simulated one-year terminal rates; the vertical line "
+        "marks the expected terminal Euribor rate.",
+    )
 
 
 def refresh_narrative_sidecar() -> None:
@@ -474,6 +513,8 @@ def refresh_narrative_sidecar() -> None:
         "",
         "### 1(a) Heston calibration using Lewis (2001)",
         "",
+        "Heston represents equity returns with a randomly changing, mean-reverting variance process that can reproduce volatility clustering and implied-volatility skew. Lewis converts its characteristic function into a one-dimensional Fourier pricing integral.",
+        "",
         f"The 15-day calls and puts were fitted jointly using the Heston specification and Lewis representation (Heston 327-343; Lewis), with unweighted USD price MSE as required by the project brief (WorldQuant University 1-2). The fitted parameters are kappa={metric(context.heston_15.kappa)}, theta={metric(context.heston_15.theta)}, sigma={metric(context.heston_15.sigma)}, rho={metric(context.heston_15.rho)}, and initial variance={metric(context.heston_15.v0)}. MSE is {metric(context.mse_15)} and RMSE is ${metric(np.sqrt(context.mse_15))}.",
         "",
         f"The input quotes have a put-call parity RMSE of ${metric(np.sqrt(np.mean(context.parity_gap**2)))}; an arbitrage-consistent fit cannot make all residuals zero. Short maturity also weakens identification of long-run variance and mean reversion.",
@@ -484,11 +525,15 @@ def refresh_narrative_sidecar() -> None:
         "",
         "### 1(b) Carr-Madan comparison",
         "",
+        "Carr-Madan damps the option-price function so it can be evaluated through an integrable Fourier transform, providing an independent pricing and calibration route for the same Heston dynamics.",
+        "",
         f"The damped transform follows Carr and Madan (61-73). Its MSE is {metric(context.mse_cm_15)}, compared with {metric(context.mse_15)} for Lewis. Fitted prices and numerical stability are the meaningful comparison.",
         "",
         "![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)",
         "",
         "### 1(c) 20-day ATM Asian call",
+        "",
+        "The arithmetic-average Asian payoff reduces dependence on a single terminal stock price. Monte Carlo simulation is required because the payoff depends on the complete daily path.",
         "",
         f"Today's spot is included in the arithmetic average, following the project instructions (WorldQuant University 1-2). Across {len(context.asian_samples):,} risk-neutral scenarios, fair value is ${metric(context.asian_fair)} (standard error ${metric(context.asian_se)}), with a 95% estimator interval of ${metric(context.asian_fair - 1.96 * context.asian_se)} to ${metric(context.asian_fair + 1.96 * context.asian_se)}. The 4% fee produces a client price of ${metric(context.asian_client)}.",
         "",
@@ -498,11 +543,15 @@ def refresh_narrative_sidecar() -> None:
         "",
         "### 2(a) Bates calibration using Lewis",
         "",
+        "Bates extends Heston with random discontinuous price jumps, allowing the model to represent rare abrupt moves in addition to ordinary stochastic-volatility dynamics.",
+        "",
         f"The 60-day jump-diffusion calibration follows Bates (69-107) and has MSE {metric(context.mse_bates_lewis)} and RMSE ${metric(np.sqrt(context.mse_bates_lewis))}.",
         "",
         "![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)",
         "",
         "### 2(b) Carr-Madan comparison",
+        "",
+        "This specification retains the Bates jump and variance dynamics but uses the Carr-Madan transform as a numerical cross-check of Lewis pricing.",
         "",
         f"The matching Carr-Madan calibration follows Carr and Madan (61-73) and has MSE {metric(context.mse_bates_cm)}. The comparison is based on fitted-price errors and numerical stability.",
         "",
@@ -516,11 +565,15 @@ def refresh_narrative_sidecar() -> None:
         "",
         "### 3(a) CIR calibration",
         "",
+        "CIR models a non-negative, mean-reverting short rate and connects its parameters to the Euribor curve through closed-form zero-coupon bond prices.",
+        "",
         f"The supplied curve contains 0.648% (1 week), 0.679% (1 month), 1.173% (3 months), 1.809% (6 months), and 2.556% (12 months). Weekly interpolation follows the project brief (WorldQuant University 3-4), and the rate model follows Cox, Ingersoll, and Ross (385-407). The fitted values are a={metric(context.cir[0])}, b={metric(context.cir[1])}, eta={metric(context.cir[2])}; MSE is {context.cir_mse:.8f}.",
         "",
         "![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)",
         "",
         "### 3(b) One-year rate scenarios",
+        "",
+        "Daily CIR simulation turns the calibrated rate dynamics into a one-year distribution, supporting an expected-rate estimate and an explicit measure of rate uncertainty.",
         "",
         f"Following the required simulation size (WorldQuant University 4), 100,000 daily scenarios give an expected terminal 12-month Euribor of {context.cir_terminal.mean():.4%}; the 95% range is {np.quantile(context.cir_terminal, 0.025):.4%} to {np.quantile(context.cir_terminal, 0.975):.4%}. Higher expected rates increase discounting of future positive cash flows and generally lower present values, all else equal.",
         "",

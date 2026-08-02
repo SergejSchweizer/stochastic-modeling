@@ -31,3 +31,22 @@ def test_notebook_cells_are_call_only_and_have_outputs():
             isinstance(node, (ast.Assign, ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Lambda))
             for node in ast.walk(tree)
         )
+
+
+def test_notebook_has_eight_point_equation_and_plot_annotations():
+    root = Path(__file__).resolve().parents[1]
+    notebook = nbformat.read(root / "notebooks" / "MScFE622_GWP1.ipynb", as_version=4)
+    markdown = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "markdown")
+    descriptions = [
+        output.data["text/html"]
+        for cell in notebook.cells
+        if cell.cell_type == "code"
+        for output in cell.outputs
+        if output.output_type in ("display_data", "execute_result")
+        and "text/html" in output.data
+        and "plot-description" in output.data["text/html"]
+    ]
+
+    assert "font-size: 8pt !important" in markdown
+    assert len(descriptions) == 8
+    assert all("font-size: 8pt !important" in description for description in descriptions)
