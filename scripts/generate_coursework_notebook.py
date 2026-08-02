@@ -38,6 +38,23 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
   font-family: Arial, Calibri, sans-serif;
   font-size: 10pt;
   line-height: 1.55;
+    text-align: justify;
+    text-align-last: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+.jp-RenderedHTMLCommon h1,
+.jp-RenderedHTMLCommon h2,
+.jp-RenderedHTMLCommon h3,
+.jp-RenderedHTMLCommon h4 {
+    text-align: center;
+    text-align-last: center;
+}
+.jp-RenderedHTMLCommon p,
+.jp-RenderedHTMLCommon li {
+    font-size: 10pt;
+    text-align: justify;
+    text-align-last: center;
 }
 .jp-RenderedHTMLCommon h1 {
   color: #28345c;
@@ -56,16 +73,31 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
   background: #f4f7fb;
   border-left: 4px solid #4b7f9f;
   color: #263849;
+    font-size: 10pt;
   margin: 1rem 0;
   padding: 0.7rem 1rem;
 }
 .jp-RenderedHTMLCommon table {
   border-collapse: collapse;
-  font-size: 9pt;
+    font-size: 10pt !important;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+}
+.jp-RenderedHTMLCommon th,
+.jp-RenderedHTMLCommon td {
+    font-size: 10pt !important;
+    text-align: center !important;
+    text-align-last: center !important;
 }
 .jp-RenderedHTMLCommon th {
   background: #e9eef6;
   color: #28345c;
+}
+.jp-RenderedHTMLCommon img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
 }
 .jp-RenderedHTMLCommon mjx-container[display="true"],
 .jp-RenderedHTMLCommon .MathJax_Display {
@@ -78,14 +110,16 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
 .jp-RenderedHTMLCommon .MathJax .mjx-tag,
 .jp-RenderedHTMLCommon .MathJax_Display .mjx-tag,
 .jp-RenderedHTMLCommon .mtd[id^="mjx-eqn"],
-.jp-RenderedHTMLCommon [id^="mjx-eqn"],
-.plot-description {
-  font-size: 8pt !important;
+.jp-RenderedHTMLCommon [id^="mjx-eqn"] {
+    font-size: 8pt !important;
 }
 .plot-description {
+    font-size: 8pt !important;
   line-height: 1.3;
   color: #444;
   margin: 0.25rem 0 1rem;
+    text-align: center;
+    text-align-last: center;
 }
 </style>
 <!-- NOTEBOOK_THEME_END -->"""

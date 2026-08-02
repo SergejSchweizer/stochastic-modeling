@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "outputs" / "MScFE622_GWP1.html"
 EXPECTED_EQUATIONS = [f"({number})" for number in range(1, 26)]
 EXPECTED_PLOT_DESCRIPTIONS = 8
-EIGHT_POINTS_IN_PIXELS = 8 * 96 / 72
+EQUATION_LABEL_POINTS_IN_PIXELS = 8 * 96 / 72
+PLOT_DESCRIPTION_POINTS_IN_PIXELS = 8 * 96 / 72
+NORMAL_TEXT_POINTS_IN_PIXELS = 10 * 96 / 72
 
 
 def _launch_browser(playwright):
@@ -23,6 +25,12 @@ def _launch_browser(playwright):
 def _font_size(locator) -> float:
     value = locator.evaluate("element => getComputedStyle(element).fontSize")
     return float(value.removesuffix("px"))
+
+
+def _all_have_font_size(locator, expected: float) -> bool:
+    return all(
+        abs(_font_size(locator.nth(index)) - expected) < 0.05 for index in range(locator.count())
+    )
 
 
 def main() -> None:
@@ -39,26 +47,60 @@ def main() -> None:
         labels = page.locator('span.mjx-mtd[id^="mjx-eqn-"]')
         errors = page.locator(".MathJax_Error, mjx-merror")
         descriptions = page.locator(".plot-description")
+        paragraphs = page.locator(".jp-RenderedMarkdown p:not(.plot-description)")
+        list_items = page.locator(".jp-RenderedMarkdown li")
+        headings = page.locator(
+            ".jp-RenderedMarkdown h1, .jp-RenderedMarkdown h2, .jp-RenderedMarkdown h3, .jp-RenderedMarkdown h4"
+        )
+        table_cells = page.locator(".jp-RenderedHTMLCommon th, .jp-RenderedHTMLCommon td")
 
         assert equations.count() == len(EXPECTED_EQUATIONS)
         assert labels.all_text_contents() == EXPECTED_EQUATIONS
         assert errors.count() == 0
         assert descriptions.count() == EXPECTED_PLOT_DESCRIPTIONS
+        assert all(
+            text.startswith(f"Plot {index}.")
+            for index, text in enumerate(descriptions.all_text_contents(), start=1)
+        )
         images = page.locator("img")
         assert images.count() == EXPECTED_PLOT_DESCRIPTIONS
         assert all(images.nth(index).get_attribute("alt") for index in range(images.count()))
+        assert _all_have_font_size(labels, EQUATION_LABEL_POINTS_IN_PIXELS)
+        assert _all_have_font_size(descriptions, PLOT_DESCRIPTION_POINTS_IN_PIXELS)
+        assert paragraphs.count() > 0
+        assert _all_have_font_size(paragraphs, NORMAL_TEXT_POINTS_IN_PIXELS)
+        assert list_items.count() > 0
+        assert _all_have_font_size(list_items, NORMAL_TEXT_POINTS_IN_PIXELS)
         assert all(
-            abs(_font_size(labels.nth(index)) - EIGHT_POINTS_IN_PIXELS) < 0.05
-            for index in range(labels.count())
+            paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            == "justify"
+            for index in range(paragraphs.count())
         )
         assert all(
-            abs(_font_size(descriptions.nth(index)) - EIGHT_POINTS_IN_PIXELS) < 0.05
-            for index in range(descriptions.count())
+            paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlignLast")
+            == "center"
+            for index in range(paragraphs.count())
+        )
+        assert headings.count() > 0
+        assert all(
+            headings.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            == "center"
+            for index in range(headings.count())
+        )
+        assert table_cells.count() > 0
+        assert _all_have_font_size(table_cells, NORMAL_TEXT_POINTS_IN_PIXELS)
+        assert all(
+            table_cells.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            == "center"
+            for index in range(table_cells.count())
         )
         assert r"\tag{" not in page.locator("body").inner_text()
         browser.close()
 
-    print("Browser rendering checks passed: 25 equations and 8 plot descriptions at 8 pt.")
+    print(
+        "Browser rendering checks passed: centered headings and tables, justified text, and "
+        "8 pt annotations."
+    )
 
 
 if __name__ == "__main__":
