@@ -42,6 +42,7 @@ def _context() -> SimpleNamespace:
 
 def _save_figure(name: str, description: str) -> None:
     context = _context()
+    context.plot_number += 1
     figure = plt.gcf()
     plt.tight_layout()
     figure.savefig(context.figure_dir / name, dpi=180, bbox_inches="tight")
@@ -50,7 +51,7 @@ def _save_figure(name: str, description: str) -> None:
     display(
         HTML(
             '<p class="plot-description" style="font-size: 8pt !important;">'
-            f"<strong>Plot description.</strong> {escape(description)}</p>"
+            f"<strong>Plot {context.plot_number}.</strong> {escape(description)}</p>"
         )
     )
 
@@ -86,6 +87,7 @@ def initialize_workflow() -> None:
         root=root,
         data_dir=root / "data",
         figure_dir=figure_dir,
+        plot_number=0,
         spot=232.90,
         rate=0.015,
         days_per_year=250,
@@ -180,17 +182,26 @@ def show_heston_lewis_calibration() -> None:
         "so most remaining error is explained by the internal call-put inconsistency rather "
         f"than Fourier integration. The largest residual is "
         f"${largest_residual.residual:+.4f} for the {largest_residual.type} option at strike "
-        f"${largest_residual.strike:.2f}.",
+        f"${largest_residual.strike:.2f}. In the fitted-price plot, call values decline and "
+        "put values rise as strike increases, as expected. A positive residual means the "
+        "model overprices the quote, whereas a negative residual means it underprices it; "
+        "the residual chart therefore reveals systematic differences that the headline RMSE "
+        "alone would conceal.",
         f"**Parameter interpretation.** Initial variance {context.heston_15.v0:.4f} implies "
         f"annualized spot volatility of {np.sqrt(context.heston_15.v0):.2%}. The strongly "
         f"negative correlation rho={context.heston_15.rho:.4f} produces the leverage effect, "
         f"while sigma={context.heston_15.sigma:.4f} permits rapid variance changes. The "
         f"long-run variance theta={context.heston_15.theta:.4f} corresponds to only "
-        f"{np.sqrt(context.heston_15.theta):.2%} volatility and lies at its lower bound.",
+        f"{np.sqrt(context.heston_15.theta):.2%} volatility and lies at its lower bound. "
+        "Economically, the negative correlation makes adverse stock-price shocks coincide "
+        "with rising variance, which raises the relative value of downside protection and "
+        "helps generate the observed volatility skew.",
         f"**Identification and model risk.** The Feller diagnostic is {feller:.4f}, below "
         "zero, so fitted variance can approach the boundary. Fifteen-day options weakly "
         "identify kappa and theta; these values reproduce this cross-section but should not "
-        "be interpreted as reliable long-horizon forecasts.",
+        "be interpreted as reliable long-horizon forecasts. The calibration should therefore "
+        "be judged primarily by near-term fitted prices and residuals, not by attaching strong "
+        "economic meaning to every parameter estimate.",
     )
 
 
@@ -275,13 +286,19 @@ def show_heston_carr_madan_calibration() -> None:
         f"**Numerical agreement.** The calibrations reach essentially identical losses: MSE "
         f"{context.mse_15:.6f} for Lewis and {context.mse_cm_15:.6f} for Carr-Madan. Holding "
         "the Lewis parameters fixed, the largest cross-method difference at the diagnostic "
-        f"strikes is only ${maximum_pricing_difference:.6f}.",
+        f"strikes is only ${maximum_pricing_difference:.6f}. Because both methods evaluate "
+        "the same risk-neutral Heston distribution through different transforms, this close "
+        "agreement is a useful implementation check: numerical integration choice is not "
+        "driving the reported option values.",
         f"**Why parameters differ.** Despite equal prices, kappa changes from "
         f"{context.heston_15.kappa:.4f} to {context.heston_cm_15.kappa:.4f}. Short-dated "
         "options mainly identify current variance, skew, and short-run variance-of-variance; "
         "many kappa-theta combinations generate nearly the same 15-day distribution. This "
         "is evidence of an objective-function ridge, not a material disagreement between the "
-        "two Fourier formulas.",
+        "two Fourier formulas. Consequently, fitted prices are stable even when individual "
+        "parameters are not; risk management should emphasize price sensitivities and "
+        "recalibration behavior rather than selecting a method because its kappa appears more "
+        "plausible.",
     )
     fit = context.short.copy()
     fit["model"] = _prices(context.short, context.heston_cm_15, "carr_madan")
@@ -343,12 +360,17 @@ def show_asian_call_valuation() -> None:
         f"error is ${context.asian_se:.4f}, or {context.asian_se / context.asian_fair:.2%} of "
         f"the estimate. The 95% Monte Carlo interval of ${estimate.confidence_low:.4f} to "
         f"${estimate.confidence_high:.4f} is narrow enough that simulation noise is immaterial "
-        "relative to calibration and model risk.",
+        "relative to calibration and model risk. The payoff histogram is right-skewed and "
+        "contains many zero or small outcomes because the call pays only when the arithmetic "
+        "average exceeds the strike. The vertical line is the probability-weighted mean of "
+        "those outcomes, not the most likely realized payoff.",
         f"**Client quote.** Applying the required 4% fee gives ${context.asian_client:.4f}. "
         "In plain language, the quote is based on many plausible daily price paths inferred "
         "from traded options; averaging prices dampens the effect of any single day's move. "
         "The confidence interval measures numerical precision, not a guaranteed range for the "
-        "eventual payoff.",
+        "eventual payoff. The 4% fee compensates the seller above model fair value but does not "
+        "eliminate exposure to parameter uncertainty, discrete hedging, transaction costs, or "
+        "a future volatility regime that differs from the calibration sample.",
     )
 
 
@@ -412,17 +434,25 @@ def show_bates_lewis_calibration() -> None:
         f"**Fit quality.** The 60-day RMSE is ${np.sqrt(context.mse_bates_lewis):.4f}. "
         "The observed calls are not monotonically decreasing at the lowest strikes, and the "
         f"call-put pairs have parity RMSE ${context.medium_parity_rmse:.4f}; an "
-        "arbitrage-consistent model therefore cannot match every quote exactly.",
+        "arbitrage-consistent model therefore cannot match every quote exactly. The plotted "
+        "Bates curves smooth across these noisy or inconsistent observations, so visible gaps "
+        "should not automatically be read as integration failure. They show the compromise "
+        "required when one parameter vector is fitted jointly to all calls and puts.",
         f"**Jump interpretation.** Intensity {context.bates_60_lewis.jump_intensity:.4f} "
         f"implies a {jump_probability:.2%} probability of at least one jump over 60 trading "
         f"days. Mean log-jump {context.bates_60_lewis.jump_mean:.4f} is positive, while jump "
         f"volatility {context.bates_60_lewis.jump_vol:.4f} is at its lower bound. The optimizer "
         "is using an almost deterministic jump component to absorb shape in an inconsistent "
-        "price cross-section.",
+        "price cross-section. Thus the fitted jump probability describes the model's chosen "
+        "risk-neutral mechanism for matching prices; it is neither a historical forecast of "
+        "real-world jump frequency nor direct evidence that upward jumps are expected.",
         f"**Stability warning.** rho={context.bates_60_lewis.rho:.3f} is at the upper bound, "
         f"theta and v0 are at their lower bounds, and the Feller diagnostic is "
         f"{bates_feller:.4f}. The fit is usable for this near-maturity exercise, but the "
-        "individual parameters should not be extrapolated as economic forecasts.",
+        "individual parameters should not be extrapolated as economic forecasts. Several "
+        "parameters pressing against bounds also indicate that the available strikes do not "
+        "contain enough independent information to identify all eight Bates parameters "
+        "reliably; small quote changes may therefore produce large parameter changes.",
     )
 
 
@@ -453,12 +483,18 @@ def show_bates_carr_madan_calibration() -> None:
         "Bates pricing-method comparison",
         f"**Price fit.** Lewis and Carr-Madan produce nearly the same loss: MSE "
         f"{context.mse_bates_lewis:.6f} versus {context.mse_bates_cm:.6f}. This supports the "
-        "numerical implementation of both characteristic-function integrations.",
+        "numerical implementation of both characteristic-function integrations. The nearly "
+        "overlapping fitted curves imply that the practical valuation conclusion is robust to "
+        "the Fourier representation, even though neither representation can remove defects in "
+        "the market cross-section.",
         f"**Parameter stability.** Jump intensity and mean jump size are nearly unchanged, "
         f"but kappa moves from {context.bates_60_lewis.kappa:.4f} to "
         f"{context.bates_60_cm.kappa:.4f}. Because both solutions sit on several bounds and "
         "have almost equal MSE, the objective has a flat or multi-modal direction. Price "
-        "agreement is more credible than equality of every parameter.",
+        "agreement is more credible than equality of every parameter. This distinction matters "
+        "for use: either method can support interpolation near the calibrated contracts, but "
+        "parameter-dependent stress tests or long-maturity extrapolations require additional "
+        "stability checks.",
     )
     fit = context.medium.copy()
     fit["model"] = _prices(context.medium, context.bates_60_cm, "carr_madan")
@@ -509,11 +545,18 @@ def show_seventy_day_put_valuation() -> None:
         f"The assignment's 95% moneyness convention gives K/S0=0.95 and strike "
         f"${0.95 * context.spot:.3f}. The selected Bates-Lewis calibration gives fair value "
         f"${context.fair_put70:.4f}; adding the 4% fee produces a client price of "
-        f"${1.04 * context.fair_put70:.4f}.",
+        f"${1.04 * context.fair_put70:.4f}. Because the strike is below spot, the put begins "
+        "out of the money and its value is entirely time value: the premium reflects the "
+        "risk-neutral probability and severity of SM Energy falling below the strike before "
+        "expiry, including the downside-tail contribution generated by stochastic volatility "
+        "and jumps.",
         "The maturity is ten trading days beyond the 60-day calibration set. This is a modest "
         "extrapolation, but the boundary-sensitive Bates parameters make model risk more "
         "important than numerical integration error. A production quote should be checked "
-        "against fresh 60- to 70-day market data where available.",
+        "against fresh 60- to 70-day market data where available. The client price is therefore "
+        "a model-based indication rather than a guaranteed hedge cost; liquidity, bid-ask "
+        "spreads, recalibration risk, and the desk's hedging expenses may justify an additional "
+        "commercial reserve beyond the stated fee.",
     )
 
 
@@ -575,12 +618,18 @@ def show_cir_calibration() -> None:
         f"half-life of about {half_life:.2f} years. Long-run level b={context.cir[1]:.4%} "
         f"lies above the current one-year Euribor of {context.euribor[-1]:.4%}, creating "
         f"upward drift. Volatility eta={context.cir[2]:.4f} is large relative to the rate "
-        "level and drives a wide, right-skewed forecast distribution.",
+        "level and drives a wide, right-skewed forecast distribution. Mean reversion pulls "
+        "rates toward b rather than allowing shocks to persist indefinitely, while the "
+        "square-root volatility term makes absolute uncertainty smaller when rates are near "
+        "zero and preserves non-negative simulated rates.",
         f"**Fit and limitation.** The curve RMSE is approximately {curve_rmse_bps:.2f} basis "
         f"points, so the fitted line tracks the weekly spline closely. However, the Feller "
         f"diagnostic is {context.cir_model.feller_diagnostic:.4f}, below zero, meaning the "
         "process can reach the zero boundary. The excellent in-sample fit does not remove "
-        "long-horizon uncertainty inferred from only five supplied tenors.",
+        "long-horizon uncertainty inferred from only five supplied tenors. Moreover, the CIR "
+        "curve is fitted to spline-interpolated observations, so the dense weekly line adds "
+        "visual smoothness rather than new market information between the original tenor "
+        "points.",
     )
 
 
@@ -635,13 +684,18 @@ def show_cir_scenarios() -> None:
         f"{context.cir_terminal.mean():.4%} is {expected_change_bps:.1f} basis points above "
         f"current 12-month Euribor {context.euribor[-1]:.4%}. The selected 95% interval is "
         f"{lower:.4%} to {upper:.4%}. Its zero lower endpoint and long upper tail follow from "
-        "the non-negative square-root process combined with high fitted volatility.",
+        "the non-negative square-root process combined with high fitted volatility. The mean "
+        "sits to the right of the histogram's most concentrated region because relatively rare "
+        "high-rate scenarios pull the arithmetic average upward; the interval is a model-based "
+        "scenario range, not a confidence interval for the estimated mean.",
         "**Pricing implication.** If higher rates feed into the future discount curve, the "
         "present value of fixed positive cash flows falls and financing assumptions change. "
         "Option values move through both discounting and risk-neutral drift, so the direction "
         "is product-dependent rather than universally negative. The simulated short rate is "
         "used as a proxy for the requested 12-month Euribor; a production multi-curve model "
-        "would represent that tenor and its spread explicitly.",
+        "would represent that tenor and its spread explicitly. Decisions based on the tail "
+        "scenarios should also account for parameter and curve-construction uncertainty, which "
+        "is not included in the conditional Monte Carlo distribution shown here.",
     )
 
 

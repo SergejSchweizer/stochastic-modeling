@@ -9,7 +9,7 @@ from xml.sax.saxutils import escape
 
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -96,6 +96,7 @@ def _styles():
             fontSize=15,
             leading=18,
             textColor=PURPLE,
+            alignment=TA_CENTER,
             spaceBefore=12,
             spaceAfter=8,
             keepWithNext=True,
@@ -109,6 +110,7 @@ def _styles():
             fontSize=12,
             leading=15,
             textColor=BLUE,
+            alignment=TA_CENTER,
             spaceBefore=10,
             spaceAfter=6,
             keepWithNext=True,
@@ -122,7 +124,7 @@ def _styles():
             fontSize=10,
             leading=14,
             textColor=INK,
-            alignment=TA_LEFT,
+            alignment=TA_JUSTIFY,
             spaceAfter=7,
         )
     )
@@ -131,8 +133,8 @@ def _styles():
             name="Caption",
             parent=styles["BodyText"],
             fontName="Helvetica-Oblique",
-            fontSize=8.5,
-            leading=11,
+            fontSize=8,
+            leading=10,
             textColor=colors.HexColor("#52616B"),
             alignment=TA_CENTER,
             spaceAfter=10,
@@ -166,6 +168,7 @@ def _report_story():
     styles = _styles()
     story = []
     skipping_submission = False
+    plot_number = 0
     image_pattern = re.compile(r"!\[(?P<caption>.+)]\((?P<path>.+)\)")
     lines = README.read_text(encoding="utf-8").splitlines()
 
@@ -193,9 +196,14 @@ def _report_story():
             continue
         image_match = image_pattern.fullmatch(line)
         if image_match:
+            plot_number += 1
             image_path = ROOT / image_match.group("path")
             story.append(
-                _image_flowable(image_path, image_match.group("caption"), styles["Caption"])
+                _image_flowable(
+                    image_path,
+                    f"Plot {plot_number}. {image_match.group('caption')}",
+                    styles["Caption"],
+                )
             )
             continue
         if line.startswith("- "):

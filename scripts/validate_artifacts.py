@@ -74,6 +74,10 @@ def main() -> None:
     ]
     assert len(plot_descriptions) == 8
     assert all("font-size: 8pt !important" in description for description in plot_descriptions)
+    assert [
+        re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
+        for description in plot_descriptions
+    ] == [str(number) for number in range(1, 9)]
     discussion_headings = {
         output.data["text/markdown"].splitlines()[0]
         for cell in code_cells
@@ -120,6 +124,7 @@ def main() -> None:
     assert positions == sorted(positions)
     assert pdf.metadata.title == "Stochastic Modeling Group Work Project 1"
     assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
+    assert all(f"Plot {number}." in pdf_text for number in range(1, 9))
 
 
 if __name__ == "__main__":
