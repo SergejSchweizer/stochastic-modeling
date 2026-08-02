@@ -6,7 +6,7 @@ This companion presents the assumptions, results, interpretations, and figures f
 
 ## Step 1 - 15-day derivative
 
-### 1(a) Heston calibration using Lewis (2001)
+### 1(i) Heston calibration using Lewis (2001)
 
 Heston represents equity returns with a randomly changing, mean-reverting variance process that can reproduce volatility clustering and implied-volatility skew. Lewis converts its characteristic function into a one-dimensional Fourier pricing integral.
 
@@ -20,7 +20,7 @@ Initial variance implies 32.93% annualized volatility and rho=-0.9444 indicates 
 
 ![15-day residuals](outputs/figures/step1a_residuals.png)
 
-### 1(b) Carr-Madan comparison
+### 1(ii) Carr-Madan comparison
 
 Carr-Madan damps the option-price function so it can be evaluated through an integrable Fourier transform, providing an independent pricing and calibration route for the same Heston dynamics.
 
@@ -30,7 +30,7 @@ Kappa changes from 2.2032 under Lewis to 0.0504 under Carr-Madan even though the
 
 ![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)
 
-### 1(c) 20-day ATM Asian call
+### 1(iii) 20-day ATM Asian call
 
 The arithmetic-average Asian payoff reduces dependence on a single terminal stock price. Monte Carlo simulation is required because the payoff depends on the complete daily path.
 
@@ -44,7 +44,7 @@ The standard error is 0.27% of fair value, so simulation noise is small relative
 
 ## Step 2 - 60-day derivative
 
-### 2(a) Bates calibration using Lewis
+### 2(i) Bates calibration using Lewis
 
 Bates extends Heston with random discontinuous price jumps, allowing the model to represent rare abrupt moves in addition to ordinary stochastic-volatility dynamics.
 
@@ -54,7 +54,7 @@ The call-put pairs have parity RMSE $2.2533. Rho is at its upper bound, theta an
 
 ![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)
 
-### 2(b) Carr-Madan comparison
+### 2(ii) Carr-Madan comparison
 
 This specification retains the Bates jump and variance dynamics but uses the Carr-Madan transform as a numerical cross-check of Lewis pricing.
 
@@ -64,7 +64,7 @@ Jump intensity and mean jump size remain stable across methods, but kappa change
 
 ![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)
 
-### 2(c) 70-day 95%-moneyness put
+### 2(iii) 70-day 95%-moneyness put
 
 The project specifies a strike of 95% of spot (WorldQuant University 3), giving $221.25. Fair value is $8.8187 and the price after the 4% fee is $9.1715.
 
@@ -72,7 +72,7 @@ The 70-day maturity is a ten-trading-day extrapolation beyond the calibration sa
 
 ## Step 3 - Euribor rates
 
-### 3(a) CIR calibration
+### 3(i) CIR calibration
 
 CIR models a non-negative, mean-reverting short rate and connects its parameters to the Euribor curve through closed-form zero-coupon bond prices.
 
@@ -82,7 +82,7 @@ Mean reversion implies a half-life of 0.92 years, while the long-run rate 7.4170
 
 ![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)
 
-### 3(b) One-year rate scenarios
+### 3(ii) One-year rate scenarios
 
 Daily CIR simulation turns the calibrated rate dynamics into a one-year distribution, supporting an expected-rate estimate and an explicit measure of rate uncertainty.
 

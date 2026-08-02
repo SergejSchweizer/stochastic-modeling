@@ -1,8 +1,11 @@
 import ast
+import base64
 import re
 import subprocess
+from io import BytesIO
 from pathlib import Path
 
+import matplotlib.image as mpimg
 import nbformat
 
 
@@ -51,7 +54,7 @@ def test_notebook_has_numbered_eight_point_equation_and_plot_annotations():
     assert "font-size: 8pt !important" in markdown
     equations = re.findall(r"\$\$(.*?)\$\$", markdown, flags=re.DOTALL)
     assert len(equations) == 25
-    assert all(r"\tag{" in equation for equation in equations)
+    assert all(r"\tag*{" in equation for equation in equations)
     assert r"\[" not in markdown and r"\]" not in markdown
     assert len(descriptions) == 9
     assert all("font-size: 8pt !important" in description for description in descriptions)
@@ -59,3 +62,39 @@ def test_notebook_has_numbered_eight_point_equation_and_plot_annotations():
         re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
         for description in descriptions
     ] == [str(number) for number in range(1, 10)]
+
+    sub_exercise_headings = re.findall(r"^## ([123]\([^)]+\)) ", markdown, flags=re.MULTILINE)
+    assert sub_exercise_headings == [
+        "1(i)",
+        "1(ii)",
+        "1(iii)",
+        "2(i)",
+        "2(ii)",
+        "2(iii)",
+        "3(i)",
+        "3(ii)",
+    ]
+
+
+def test_notebook_plot_four_contains_simulated_paths():
+    root = Path(__file__).resolve().parents[1]
+    notebook = nbformat.read(root / "notebooks" / "MScFE622_GWP1.ipynb", as_version=4)
+    plot_four_cell = next(
+        cell
+        for cell in notebook.cells
+        if cell.cell_type == "code"
+        and any(
+            "<strong>Plot 4.</strong>" in output.data.get("text/html", "")
+            for output in cell.outputs
+            if output.output_type in ("display_data", "execute_result")
+        )
+    )
+    plot_four_output = next(
+        output
+        for output in plot_four_cell.outputs
+        if output.output_type in ("display_data", "execute_result") and "image/png" in output.data
+    )
+    image = mpimg.imread(BytesIO(base64.b64decode(plot_four_output.data["image/png"])))
+    blue_path_pixels = image[..., 2] - image[..., 0] > 0.15
+
+    assert blue_path_pixels.mean() > 0.1

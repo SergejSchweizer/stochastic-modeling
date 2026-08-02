@@ -46,10 +46,29 @@ def main() -> None:
     display_equations = re.findall(r"\$\$(.*?)\$\$", markdown_text, flags=re.DOTALL)
     assert display_equations, "notebook has no display equations"
     assert len(display_equations) == 25
-    assert all("\\tag{" in equation for equation in display_equations)
+    assert all("\\tag*{" in equation for equation in display_equations)
     assert r"\[" not in markdown_text and r"\]" not in markdown_text
-    equation_numbers = [int(number) for number in re.findall(r"\\tag\{(\d+)\}", markdown_text)]
+    equation_numbers = [
+        int(number)
+        for number in re.findall(r"\\tag\*\{\$\\scriptstyle \((\d+)\)\$\}", markdown_text)
+    ]
     assert equation_numbers == list(range(1, 26))
+    parameter_blocks = {
+        "**Parameters (Equations 1-3).**": 1,
+        "**Parameters (Equation 4).**": 4,
+        "**Parameters (Equations 5-6).**": 5,
+        "**Parameters (Equation 7).**": 7,
+        "**Parameters (Equations 8-9).**": 8,
+        "**Parameters (Equations 10-13).**": 10,
+        "**Parameters (Equations 14-16).**": 14,
+        "**Parameters (Equation 17).**": 17,
+        "**Parameters (Equations 18-23).**": 18,
+        "**Parameters (Equations 24-25).**": 24,
+    }
+    for label, first_equation in parameter_blocks.items():
+        assert label in markdown_text
+        equation_tag = rf"\tag*{{$\scriptstyle ({first_equation})$}}"
+        assert markdown_text.index(label) < markdown_text.index(equation_tag)
     assert not any(character in markdown_text for character in ("\a", "\b", "\f", "\v"))
     assert "font-size: 8pt !important" in markdown_text
     for explanation_label in (

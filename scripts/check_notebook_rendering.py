@@ -33,6 +33,23 @@ def _all_have_font_size(locator, expected: float) -> bool:
     )
 
 
+def _all_have_normal_typography(locator, allowed_weights: tuple[str, ...] = ("400",)) -> bool:
+    return all(
+        locator.nth(index).evaluate(
+            """(element, allowedWeights) => {
+                const style = getComputedStyle(element);
+                return style.fontFamily === 'Arial, Calibri, sans-serif'
+                    && style.fontStyle === 'normal'
+                    && allowedWeights.includes(style.fontWeight)
+                    && Math.abs(parseFloat(style.fontSize) - 13.3333333333) < 0.05
+                    && Math.abs(parseFloat(style.lineHeight) - 20.6666666667) < 0.05;
+            }""",
+            list(allowed_weights),
+        )
+        for index in range(locator.count())
+    )
+
+
 def main() -> None:
     if not HTML.exists():
         raise FileNotFoundError(HTML)
@@ -45,17 +62,21 @@ def main() -> None:
 
         equations = page.locator(".MJXc-display")
         labels = page.locator('span.mjx-mtd[id^="mjx-eqn-"]')
+        label_glyphs = labels.locator(".mjx-mstyle > .mjx-mrow")
         errors = page.locator(".MathJax_Error, mjx-merror")
         descriptions = page.locator(".plot-description")
         paragraphs = page.locator(".jp-RenderedMarkdown p:not(.plot-description)")
+        lists = page.locator(".jp-RenderedMarkdown ul, .jp-RenderedMarkdown ol")
         list_items = page.locator(".jp-RenderedMarkdown li")
         headings = page.locator(
             ".jp-RenderedMarkdown h1, .jp-RenderedMarkdown h2, .jp-RenderedMarkdown h3, .jp-RenderedMarkdown h4"
         )
+        tables = page.locator(".jp-RenderedHTMLCommon table")
         table_cells = page.locator(".jp-RenderedHTMLCommon th, .jp-RenderedHTMLCommon td")
 
         assert equations.count() == len(EXPECTED_EQUATIONS)
         assert labels.all_text_contents() == EXPECTED_EQUATIONS
+        assert label_glyphs.count() == len(EXPECTED_EQUATIONS)
         assert errors.count() == 0
         assert descriptions.count() == EXPECTED_PLOT_DESCRIPTIONS
         assert all(
@@ -65,7 +86,7 @@ def main() -> None:
         images = page.locator("img")
         assert images.count() == EXPECTED_PLOT_DESCRIPTIONS
         assert all(images.nth(index).get_attribute("alt") for index in range(images.count()))
-        assert _all_have_font_size(labels, EQUATION_LABEL_POINTS_IN_PIXELS)
+        assert _all_have_font_size(label_glyphs, EQUATION_LABEL_POINTS_IN_PIXELS)
         assert _all_have_font_size(descriptions, PLOT_DESCRIPTION_POINTS_IN_PIXELS)
         assert all(
             descriptions.nth(index).evaluate("element => getComputedStyle(element).textAlign")
@@ -78,9 +99,24 @@ def main() -> None:
             for index in range(descriptions.count())
         )
         assert paragraphs.count() > 0
-        assert _all_have_font_size(paragraphs, NORMAL_TEXT_POINTS_IN_PIXELS)
+        assert _all_have_normal_typography(paragraphs)
         assert list_items.count() > 0
-        assert _all_have_font_size(list_items, NORMAL_TEXT_POINTS_IN_PIXELS)
+        assert _all_have_normal_typography(list_items)
+        assert lists.count() > 0
+        assert all(
+            lists.nth(index).evaluate("element => getComputedStyle(element).textAlign") == "center"
+            for index in range(lists.count())
+        )
+        assert all(
+            list_items.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            == "center"
+            for index in range(list_items.count())
+        )
+        assert all(
+            list_items.nth(index).evaluate("element => getComputedStyle(element).listStylePosition")
+            == "inside"
+            for index in range(list_items.count())
+        )
         assert all(
             paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlign")
             == "justify"
@@ -97,8 +133,13 @@ def main() -> None:
             == "center"
             for index in range(headings.count())
         )
+        assert tables.count() > 0
+        assert all(
+            tables.nth(index).evaluate("element => getComputedStyle(element).textAlign") == "center"
+            for index in range(tables.count())
+        )
         assert table_cells.count() > 0
-        assert _all_have_font_size(table_cells, NORMAL_TEXT_POINTS_IN_PIXELS)
+        assert _all_have_normal_typography(table_cells, allowed_weights=("400", "700"))
         assert all(
             table_cells.nth(index).evaluate("element => getComputedStyle(element).textAlign")
             == "center"

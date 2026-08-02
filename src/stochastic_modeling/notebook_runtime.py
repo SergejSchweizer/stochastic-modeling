@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from IPython.display import HTML, Markdown, display
+from IPython.display import HTML, Image, Markdown, display
 from matplotlib.collections import LineCollection
 
 from stochastic_modeling import (
@@ -45,9 +45,10 @@ def _save_figure(name: str, description: str) -> None:
     context = _context()
     context.plot_number += 1
     figure = plt.gcf()
+    figure_path = context.figure_dir / name
     plt.tight_layout()
-    figure.savefig(context.figure_dir / name, dpi=180, bbox_inches="tight")
-    display(figure, metadata={"image/png": {"alt": description}})
+    figure.savefig(figure_path, dpi=180, bbox_inches="tight")
+    display(Image(filename=figure_path), metadata={"image/png": {"alt": description}})
     plt.close(figure)
     display(
         HTML(
@@ -231,7 +232,7 @@ def show_heston_lewis_fit() -> None:
         palette="Set2",
     )
     plt.axhline(0, color="black", lw=1)
-    plt.title("Step 1(a): pricing residuals")
+    plt.title("Step 1(i): pricing residuals")
     plt.xlabel("Strike")
     plt.ylabel("Model - market (USD)")
     _save_figure(
@@ -368,7 +369,7 @@ def show_asian_call_valuation() -> None:
         ylim=(context.asian_paths.min(), context.asian_paths.max()),
         xlabel="Trading day",
         ylabel="SM Energy price (USD)",
-        title="Step 1(c): all 200,000 simulated Heston price paths",
+        title="Step 1(iii): all 200,000 simulated Heston price paths",
     )
     _save_figure(
         "step1c_asian_paths.png",
@@ -378,7 +379,7 @@ def show_asian_call_valuation() -> None:
     plt.figure(figsize=(8, 4.2))
     plt.hist(context.asian_samples, bins=70, color="#4C78A8", alpha=0.85)
     plt.axvline(context.asian_fair, color="#E45756", lw=2, label="Fair value")
-    plt.title("Step 1(c): discounted Asian-call simulation outcomes")
+    plt.title("Step 1(iii): discounted Asian-call simulation outcomes")
     plt.xlabel("Discounted payoff (USD)")
     plt.ylabel("Frequency")
     plt.legend()
@@ -638,7 +639,7 @@ def show_cir_calibration() -> None:
     )
     plt.xlabel("Maturity (days)")
     plt.ylabel("Annualized zero rate (%)")
-    plt.title("Step 3(a): Euribor term structure and CIR fit")
+    plt.title("Step 3(i): Euribor term structure and CIR fit")
     plt.legend()
     _save_figure(
         "step3a_cir_curve.png",
@@ -704,7 +705,7 @@ def show_cir_scenarios() -> None:
     )
     plt.xlabel("12-month Euribor in one year (%)")
     plt.ylabel("Frequency")
-    plt.title("Step 3(b): 100,000 simulated terminal Euribor rates")
+    plt.title("Step 3(ii): 100,000 simulated terminal Euribor rates")
     plt.legend()
     _save_figure(
         "step3b_cir_distribution.png",
@@ -750,7 +751,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "## Step 1 - 15-day derivative",
         "",
-        "### 1(a) Heston calibration using Lewis (2001)",
+        "### 1(i) Heston calibration using Lewis (2001)",
         "",
         "Heston represents equity returns with a randomly changing, mean-reverting variance process that can reproduce volatility clustering and implied-volatility skew. Lewis converts its characteristic function into a one-dimensional Fourier pricing integral.",
         "",
@@ -764,7 +765,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![15-day residuals](outputs/figures/step1a_residuals.png)",
         "",
-        "### 1(b) Carr-Madan comparison",
+        "### 1(ii) Carr-Madan comparison",
         "",
         "Carr-Madan damps the option-price function so it can be evaluated through an integrable Fourier transform, providing an independent pricing and calibration route for the same Heston dynamics.",
         "",
@@ -774,7 +775,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)",
         "",
-        "### 1(c) 20-day ATM Asian call",
+        "### 1(iii) 20-day ATM Asian call",
         "",
         "The arithmetic-average Asian payoff reduces dependence on a single terminal stock price. Monte Carlo simulation is required because the payoff depends on the complete daily path.",
         "",
@@ -788,7 +789,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "## Step 2 - 60-day derivative",
         "",
-        "### 2(a) Bates calibration using Lewis",
+        "### 2(i) Bates calibration using Lewis",
         "",
         "Bates extends Heston with random discontinuous price jumps, allowing the model to represent rare abrupt moves in addition to ordinary stochastic-volatility dynamics.",
         "",
@@ -798,7 +799,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)",
         "",
-        "### 2(b) Carr-Madan comparison",
+        "### 2(ii) Carr-Madan comparison",
         "",
         "This specification retains the Bates jump and variance dynamics but uses the Carr-Madan transform as a numerical cross-check of Lewis pricing.",
         "",
@@ -808,7 +809,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)",
         "",
-        "### 2(c) 70-day 95%-moneyness put",
+        "### 2(iii) 70-day 95%-moneyness put",
         "",
         f"The project specifies a strike of 95% of spot (WorldQuant University 3), giving ${0.95 * context.spot:.2f}. Fair value is ${metric(context.fair_put70)} and the price after the 4% fee is ${metric(1.04 * context.fair_put70)}.",
         "",
@@ -816,7 +817,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "## Step 3 - Euribor rates",
         "",
-        "### 3(a) CIR calibration",
+        "### 3(i) CIR calibration",
         "",
         "CIR models a non-negative, mean-reverting short rate and connects its parameters to the Euribor curve through closed-form zero-coupon bond prices.",
         "",
@@ -826,7 +827,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)",
         "",
-        "### 3(b) One-year rate scenarios",
+        "### 3(ii) One-year rate scenarios",
         "",
         "Daily CIR simulation turns the calibrated rate dynamics into a one-year distribution, supporting an expected-rate estimate and an explicit measure of rate uncertainty.",
         "",
