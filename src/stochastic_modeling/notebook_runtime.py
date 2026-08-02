@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from IPython.display import HTML, display
+from IPython.display import HTML, Markdown, display
 
 from stochastic_modeling import (
     CalibrationService,
@@ -42,9 +42,11 @@ def _context() -> SimpleNamespace:
 
 def _save_figure(name: str, description: str) -> None:
     context = _context()
+    figure = plt.gcf()
     plt.tight_layout()
-    plt.savefig(context.figure_dir / name, dpi=180, bbox_inches="tight")
-    plt.show()
+    figure.savefig(context.figure_dir / name, dpi=180, bbox_inches="tight")
+    display(figure, metadata={"image/png": {"alt": description}})
+    plt.close(figure)
     display(
         HTML(
             '<p class="plot-description" style="font-size: 8pt !important;">'
@@ -62,6 +64,11 @@ def _calibrate(frame: pd.DataFrame, kind: str, method: str, seed: int):
     context = _context()
     result = CalibrationService(context.pricers[method]).calibrate(frame, kind, seed)
     return result.parameters, result.mse, result.residuals
+
+
+def _show_discussion(title: str, *paragraphs: str) -> None:
+    """Render a concise, result-aware interpretation beneath an output."""
+    display(Markdown(f"#### {title}\n\n" + "\n\n".join(paragraphs)))
 
 
 def initialize_workflow() -> None:
@@ -164,6 +171,27 @@ def show_heston_lewis_calibration() -> None:
             ]
         ).round(6)
     )
+    largest_residual = context.fitted_15.iloc[context.fitted_15["residual"].abs().argmax()]
+    parity_floor = parity_rmse / 2
+    _show_discussion(
+        "Calibration discussion",
+        f"**Fit quality.** The joint calibration has RMSE ${np.sqrt(context.mse_15):.4f}. "
+        f"The quotes imply a minimum parity-consistent joint RMSE near ${parity_floor:.4f}, "
+        "so most remaining error is explained by the internal call-put inconsistency rather "
+        f"than Fourier integration. The largest residual is "
+        f"${largest_residual.residual:+.4f} for the {largest_residual.type} option at strike "
+        f"${largest_residual.strike:.2f}.",
+        f"**Parameter interpretation.** Initial variance {context.heston_15.v0:.4f} implies "
+        f"annualized spot volatility of {np.sqrt(context.heston_15.v0):.2%}. The strongly "
+        f"negative correlation rho={context.heston_15.rho:.4f} produces the leverage effect, "
+        f"while sigma={context.heston_15.sigma:.4f} permits rapid variance changes. The "
+        f"long-run variance theta={context.heston_15.theta:.4f} corresponds to only "
+        f"{np.sqrt(context.heston_15.theta):.2%} volatility and lies at its lower bound.",
+        f"**Identification and model risk.** The Feller diagnostic is {feller:.4f}, below "
+        "zero, so fitted variance can approach the boundary. Fifteen-day options weakly "
+        "identify kappa and theta; these values reproduce this cross-section but should not "
+        "be interpreted as reliable long-horizon forecasts.",
+    )
 
 
 def show_heston_lewis_fit() -> None:
@@ -241,6 +269,20 @@ def show_heston_carr_madan_calibration() -> None:
     )
     numerical_check["difference"] = numerical_check["Lewis"] - numerical_check["Carr-Madan"]
     display(numerical_check.round(6))
+    maximum_pricing_difference = numerical_check["difference"].abs().max()
+    _show_discussion(
+        "Lewis versus Carr-Madan",
+        f"**Numerical agreement.** The calibrations reach essentially identical losses: MSE "
+        f"{context.mse_15:.6f} for Lewis and {context.mse_cm_15:.6f} for Carr-Madan. Holding "
+        "the Lewis parameters fixed, the largest cross-method difference at the diagnostic "
+        f"strikes is only ${maximum_pricing_difference:.6f}.",
+        f"**Why parameters differ.** Despite equal prices, kappa changes from "
+        f"{context.heston_15.kappa:.4f} to {context.heston_cm_15.kappa:.4f}. Short-dated "
+        "options mainly identify current variance, skew, and short-run variance-of-variance; "
+        "many kappa-theta combinations generate nearly the same 15-day distribution. This "
+        "is evidence of an objective-function ridge, not a material disagreement between the "
+        "two Fourier formulas.",
+    )
     fit = context.short.copy()
     fit["model"] = _prices(context.short, context.heston_cm_15, "carr_madan")
     _, axes = plt.subplots(1, 2, figsize=(12, 4.2))
@@ -295,6 +337,19 @@ def show_asian_call_valuation() -> None:
         "The histogram shows simulated discounted Asian-call payoffs; the vertical line marks "
         "their mean, which is the estimated fair value.",
     )
+    _show_discussion(
+        "Valuation and client recommendation",
+        f"**Simulation precision.** The fair value is ${context.asian_fair:.4f}; its standard "
+        f"error is ${context.asian_se:.4f}, or {context.asian_se / context.asian_fair:.2%} of "
+        f"the estimate. The 95% Monte Carlo interval of ${estimate.confidence_low:.4f} to "
+        f"${estimate.confidence_high:.4f} is narrow enough that simulation noise is immaterial "
+        "relative to calibration and model risk.",
+        f"**Client quote.** Applying the required 4% fee gives ${context.asian_client:.4f}. "
+        "In plain language, the quote is based on many plausible daily price paths inferred "
+        "from traded options; averaging prices dampens the effect of any single day's move. "
+        "The confidence interval measures numerical precision, not a guaranteed range for the "
+        "eventual payoff.",
+    )
 
 
 def show_bates_lewis_calibration() -> None:
@@ -309,6 +364,14 @@ def show_bates_lewis_calibration() -> None:
     context.fit_bates_60 = context.medium.copy()
     context.fit_bates_60["model"] = _prices(context.medium, context.bates_60_lewis, "lewis")
     context.fit_bates_60["residual"] = context.fit_bates_60["model"] - context.fit_bates_60["price"]
+    calls = context.medium.query("type == 'C'").sort_values("strike").set_index("strike")["price"]
+    puts = context.medium.query("type == 'P'").sort_values("strike").set_index("strike")["price"]
+    parity_value = context.spot - calls.index.to_numpy() * np.exp(
+        -context.rate * 60 / context.days_per_year
+    )
+    context.medium_parity_rmse = float(
+        np.sqrt(np.mean((calls.to_numpy() - puts.to_numpy() - parity_value) ** 2))
+    )
     display(
         pd.DataFrame(
             [
@@ -337,6 +400,30 @@ def show_bates_lewis_calibration() -> None:
         "Observed 60-day option prices are compared with Bates-Lewis values, showing the fit "
         "after jump risk is added to stochastic volatility.",
     )
+    bates_feller = (
+        2 * context.bates_60_lewis.kappa * context.bates_60_lewis.theta
+        - context.bates_60_lewis.sigma**2
+    )
+    jump_probability = 1 - np.exp(
+        -context.bates_60_lewis.jump_intensity * 60 / context.days_per_year
+    )
+    _show_discussion(
+        "Bates calibration discussion",
+        f"**Fit quality.** The 60-day RMSE is ${np.sqrt(context.mse_bates_lewis):.4f}. "
+        "The observed calls are not monotonically decreasing at the lowest strikes, and the "
+        f"call-put pairs have parity RMSE ${context.medium_parity_rmse:.4f}; an "
+        "arbitrage-consistent model therefore cannot match every quote exactly.",
+        f"**Jump interpretation.** Intensity {context.bates_60_lewis.jump_intensity:.4f} "
+        f"implies a {jump_probability:.2%} probability of at least one jump over 60 trading "
+        f"days. Mean log-jump {context.bates_60_lewis.jump_mean:.4f} is positive, while jump "
+        f"volatility {context.bates_60_lewis.jump_vol:.4f} is at its lower bound. The optimizer "
+        "is using an almost deterministic jump component to absorb shape in an inconsistent "
+        "price cross-section.",
+        f"**Stability warning.** rho={context.bates_60_lewis.rho:.3f} is at the upper bound, "
+        f"theta and v0 are at their lower bounds, and the Feller diagnostic is "
+        f"{bates_feller:.4f}. The fit is usable for this near-maturity exercise, but the "
+        "individual parameters should not be extrapolated as economic forecasts.",
+    )
 
 
 def show_bates_carr_madan_calibration() -> None:
@@ -362,6 +449,17 @@ def show_bates_carr_madan_calibration() -> None:
         ]
     )
     display(comparison.round(6))
+    _show_discussion(
+        "Bates pricing-method comparison",
+        f"**Price fit.** Lewis and Carr-Madan produce nearly the same loss: MSE "
+        f"{context.mse_bates_lewis:.6f} versus {context.mse_bates_cm:.6f}. This supports the "
+        "numerical implementation of both characteristic-function integrations.",
+        f"**Parameter stability.** Jump intensity and mean jump size are nearly unchanged, "
+        f"but kappa moves from {context.bates_60_lewis.kappa:.4f} to "
+        f"{context.bates_60_cm.kappa:.4f}. Because both solutions sit on several bounds and "
+        "have almost equal MSE, the objective has a flat or multi-modal direction. Price "
+        "agreement is more credible than equality of every parameter.",
+    )
     fit = context.medium.copy()
     fit["model"] = _prices(context.medium, context.bates_60_cm, "carr_madan")
     _, axes = plt.subplots(1, 2, figsize=(12, 4.2))
@@ -405,6 +503,17 @@ def show_seventy_day_put_valuation() -> None:
                 }
             ]
         ).round(4)
+    )
+    _show_discussion(
+        "Pricing interpretation",
+        f"The assignment's 95% moneyness convention gives K/S0=0.95 and strike "
+        f"${0.95 * context.spot:.3f}. The selected Bates-Lewis calibration gives fair value "
+        f"${context.fair_put70:.4f}; adding the 4% fee produces a client price of "
+        f"${1.04 * context.fair_put70:.4f}.",
+        "The maturity is ten trading days beyond the 60-day calibration set. This is a modest "
+        "extrapolation, but the boundary-sensitive Bates parameters make model risk more "
+        "important than numerical integration error. A production quote should be checked "
+        "against fresh 60- to 70-day market data where available.",
     )
 
 
@@ -458,6 +567,21 @@ def show_cir_calibration() -> None:
         "Supplied Euribor tenors, the weekly interpolated curve, and the fitted CIR curve show "
         "how closely the rate model reproduces the observed term structure.",
     )
+    half_life = np.log(2) / context.cir_model.mean_reversion
+    curve_rmse_bps = np.sqrt(context.cir_mse) * 10_000
+    _show_discussion(
+        "CIR calibration discussion",
+        f"**Parameter interpretation.** Mean reversion a={context.cir[0]:.4f} implies a "
+        f"half-life of about {half_life:.2f} years. Long-run level b={context.cir[1]:.4%} "
+        f"lies above the current one-year Euribor of {context.euribor[-1]:.4%}, creating "
+        f"upward drift. Volatility eta={context.cir[2]:.4f} is large relative to the rate "
+        "level and drives a wide, right-skewed forecast distribution.",
+        f"**Fit and limitation.** The curve RMSE is approximately {curve_rmse_bps:.2f} basis "
+        f"points, so the fitted line tracks the weekly spline closely. However, the Feller "
+        f"diagnostic is {context.cir_model.feller_diagnostic:.4f}, below zero, meaning the "
+        "process can reach the zero boundary. The excellent in-sample fit does not remove "
+        "long-horizon uncertainty inferred from only five supplied tenors.",
+    )
 
 
 def show_cir_scenarios() -> None:
@@ -475,7 +599,17 @@ def show_cir_scenarios() -> None:
             }
         ]
     )
-    display(summary.style.format("{:.4%}"))
+    display(
+        summary.style.format(
+            {
+                "paths": "{:,.0f}",
+                "current 12M Euribor": "{:.4%}",
+                "expected 12M rate in one year": "{:.4%}",
+                "95% lower bound": "{:.4%}",
+                "95% upper bound": "{:.4%}",
+            }
+        )
+    )
     plt.figure(figsize=(8, 4.2))
     plt.hist(context.cir_terminal * 100, bins=80, color="#59A14F", alpha=0.85)
     plt.axvline(
@@ -492,6 +626,22 @@ def show_cir_scenarios() -> None:
         "step3b_cir_distribution.png",
         "The histogram summarizes 100,000 simulated one-year terminal rates; the vertical line "
         "marks the expected terminal Euribor rate.",
+    )
+    expected_change_bps = (context.cir_terminal.mean() - context.euribor[-1]) * 10_000
+    lower, upper = np.quantile(context.cir_terminal, [0.025, 0.975])
+    _show_discussion(
+        "Rate-scenario discussion",
+        f"**Distribution.** Expected one-year terminal rate "
+        f"{context.cir_terminal.mean():.4%} is {expected_change_bps:.1f} basis points above "
+        f"current 12-month Euribor {context.euribor[-1]:.4%}. The selected 95% interval is "
+        f"{lower:.4%} to {upper:.4%}. Its zero lower endpoint and long upper tail follow from "
+        "the non-negative square-root process combined with high fitted volatility.",
+        "**Pricing implication.** If higher rates feed into the future discount curve, the "
+        "present value of fixed positive cash flows falls and financing assumptions change. "
+        "Option values move through both discounting and risk-neutral drift, so the direction "
+        "is product-dependent rather than universally negative. The simulated short rate is "
+        "used as a proxy for the requested 12-month Euribor; a production multi-curve model "
+        "would represent that tenor and its spread explicitly.",
     )
 
 
@@ -519,6 +669,8 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The input quotes have a put-call parity RMSE of ${metric(np.sqrt(np.mean(context.parity_gap**2)))}; an arbitrage-consistent fit cannot make all residuals zero. Short maturity also weakens identification of long-run variance and mean reversion.",
         "",
+        f"Initial variance implies {np.sqrt(context.heston_15.v0):.2%} annualized volatility and rho={context.heston_15.rho:.4f} indicates a strong leverage effect. Theta is at its lower bound and the Feller diagnostic is {2 * context.heston_15.kappa * context.heston_15.theta - context.heston_15.sigma**2:.4f}; the parameter vector should therefore be treated as a short-horizon fit rather than a long-run forecast.",
+        "",
         "![15-day market and model prices](outputs/figures/step1a_market_vs_model.png)",
         "",
         "![15-day residuals](outputs/figures/step1a_residuals.png)",
@@ -529,6 +681,8 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The damped transform follows Carr and Madan (61-73). Its MSE is {metric(context.mse_cm_15)}, compared with {metric(context.mse_15)} for Lewis. Fitted prices and numerical stability are the meaningful comparison.",
         "",
+        f"Kappa changes from {context.heston_15.kappa:.4f} under Lewis to {context.heston_cm_15.kappa:.4f} under Carr-Madan even though the losses are identical to four decimals. This is consistent with weak short-maturity identification: the two numerical formulas agree on prices, while the optimizer can move along a flat parameter direction.",
+        "",
         "![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)",
         "",
         "### 1(c) 20-day ATM Asian call",
@@ -536,6 +690,8 @@ def refresh_narrative_sidecar() -> None:
         "The arithmetic-average Asian payoff reduces dependence on a single terminal stock price. Monte Carlo simulation is required because the payoff depends on the complete daily path.",
         "",
         f"Today's spot is included in the arithmetic average, following the project instructions (WorldQuant University 1-2). Across {len(context.asian_samples):,} risk-neutral scenarios, fair value is ${metric(context.asian_fair)} (standard error ${metric(context.asian_se)}), with a 95% estimator interval of ${metric(context.asian_fair - 1.96 * context.asian_se)} to ${metric(context.asian_fair + 1.96 * context.asian_se)}. The 4% fee produces a client price of ${metric(context.asian_client)}.",
+        "",
+        f"The standard error is {context.asian_se / context.asian_fair:.2%} of fair value, so simulation noise is small relative to calibration risk. The interval measures estimator precision and is not a guaranteed payoff range for the client.",
         "",
         "![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)",
         "",
@@ -547,6 +703,8 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The 60-day jump-diffusion calibration follows Bates (69-107) and has MSE {metric(context.mse_bates_lewis)} and RMSE ${metric(np.sqrt(context.mse_bates_lewis))}.",
         "",
+        f"The call-put pairs have parity RMSE ${context.medium_parity_rmse:.4f}. Rho is at its upper bound, theta and initial variance are at lower bounds, and jump volatility is at its lower bound. These boundary estimates and a Feller diagnostic of {2 * context.bates_60_lewis.kappa * context.bates_60_lewis.theta - context.bates_60_lewis.sigma**2:.4f} show that the eight parameters are weakly identified by this small, internally inconsistent cross-section.",
+        "",
         "![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)",
         "",
         "### 2(b) Carr-Madan comparison",
@@ -555,11 +713,15 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The matching Carr-Madan calibration follows Carr and Madan (61-73) and has MSE {metric(context.mse_bates_cm)}. The comparison is based on fitted-price errors and numerical stability.",
         "",
+        f"Jump intensity and mean jump size remain stable across methods, but kappa changes from {context.bates_60_lewis.kappa:.4f} to {context.bates_60_cm.kappa:.4f}. Nearly equal loss with very different mean reversion indicates a flat or multi-modal objective; fitted prices are more reliable than parameter equality.",
+        "",
         "![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)",
         "",
         "### 2(c) 70-day 95%-moneyness put",
         "",
         f"The project specifies a strike of 95% of spot (WorldQuant University 3), giving ${0.95 * context.spot:.2f}. Fair value is ${metric(context.fair_put70)} and the price after the 4% fee is ${metric(1.04 * context.fair_put70)}.",
+        "",
+        "The 70-day maturity is a ten-trading-day extrapolation beyond the calibration sample. The extension is modest, but the boundary-sensitive Bates estimates make calibration risk more material than the difference between the two Fourier integration methods.",
         "",
         "## Step 3 - Euribor rates",
         "",
@@ -569,6 +731,8 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The supplied curve contains 0.648% (1 week), 0.679% (1 month), 1.173% (3 months), 1.809% (6 months), and 2.556% (12 months). Weekly interpolation follows the project brief (WorldQuant University 3-4), and the rate model follows Cox, Ingersoll, and Ross (385-407). The fitted values are a={metric(context.cir[0])}, b={metric(context.cir[1])}, eta={metric(context.cir[2])}; MSE is {context.cir_mse:.8f}.",
         "",
+        f"Mean reversion implies a half-life of {np.log(2) / context.cir[0]:.2f} years, while the long-run rate {context.cir[1]:.4%} lies above current 12-month Euribor. Curve RMSE is {np.sqrt(context.cir_mse) * 10_000:.2f} basis points, but the Feller diagnostic {context.cir_model.feller_diagnostic:.4f} is negative, so the process can reach zero and the broad dynamics remain uncertain.",
+        "",
         "![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)",
         "",
         "### 3(b) One-year rate scenarios",
@@ -576,6 +740,8 @@ def refresh_narrative_sidecar() -> None:
         "Daily CIR simulation turns the calibrated rate dynamics into a one-year distribution, supporting an expected-rate estimate and an explicit measure of rate uncertainty.",
         "",
         f"Following the required simulation size (WorldQuant University 4), 100,000 daily scenarios give an expected terminal 12-month Euribor of {context.cir_terminal.mean():.4%}; the 95% range is {np.quantile(context.cir_terminal, 0.025):.4%} to {np.quantile(context.cir_terminal, 0.975):.4%}. Higher expected rates increase discounting of future positive cash flows and generally lower present values, all else equal.",
+        "",
+        f"The expected rate is {(context.cir_terminal.mean() - context.euribor[-1]) * 10_000:.1f} basis points above today's 12-month quote. The distribution is strongly right-skewed: the lower endpoint is pinned at zero while the upper tail reaches high rates. Product effects are not universal because rates influence both discounting and risk-neutral drift; the CIR short rate is used here as a proxy for 12-month Euribor rather than a full multi-curve tenor model.",
         "",
         "![Terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)",
         "",

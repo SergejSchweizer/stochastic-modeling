@@ -1,6 +1,7 @@
 """Regenerate the call-only MScFE 622 coursework notebook."""
 
 import ast
+import re
 from pathlib import Path
 
 import nbformat
@@ -25,8 +26,53 @@ CELL_SOURCES = (
     'get_ipython().run_line_magic("load_ext", "stochastic_modeling.notebook_runtime")',
     *(f"{name}()" for name in CALLS),
 )
-NOTEBOOK_STYLE = """<style>
-/* WQU presentation typography: equation labels and figure descriptions use 8 pt. */
+NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
+<style>
+/* Professional WQU notebook theme. */
+.jp-Notebook {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.jp-RenderedHTMLCommon {
+  color: #243447;
+  font-family: Arial, Calibri, sans-serif;
+  font-size: 10pt;
+  line-height: 1.55;
+}
+.jp-RenderedHTMLCommon h1 {
+  color: #28345c;
+  border-bottom: 2px solid #465b8c;
+  padding-bottom: 0.3rem;
+}
+.jp-RenderedHTMLCommon h2 {
+  color: #1f6f9f;
+  margin-top: 1.7rem;
+}
+.jp-RenderedHTMLCommon h3,
+.jp-RenderedHTMLCommon h4 {
+  color: #355070;
+}
+.jp-RenderedHTMLCommon blockquote {
+  background: #f4f7fb;
+  border-left: 4px solid #4b7f9f;
+  color: #263849;
+  margin: 1rem 0;
+  padding: 0.7rem 1rem;
+}
+.jp-RenderedHTMLCommon table {
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+.jp-RenderedHTMLCommon th {
+  background: #e9eef6;
+  color: #28345c;
+}
+.jp-RenderedHTMLCommon mjx-container[display="true"],
+.jp-RenderedHTMLCommon .MathJax_Display {
+  margin: 1.1rem 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 .jp-RenderedHTMLCommon mjx-container[jax="CHTML"][display="true"] mjx-labels,
 .jp-RenderedHTMLCommon mjx-container[jax="CHTML"][display="true"] mjx-labels *,
 .jp-RenderedHTMLCommon .MathJax .mjx-tag,
@@ -41,7 +87,8 @@ NOTEBOOK_STYLE = """<style>
   color: #444;
   margin: 0.25rem 0 1rem;
 }
-</style>"""
+</style>
+<!-- NOTEBOOK_THEME_END -->"""
 
 MODEL_EXPLANATIONS = {
     "## 1(a) Heston (1993) calibrated with the Lewis (2001) representation": (
@@ -92,6 +139,47 @@ MODEL_EXPLANATIONS = {
     ),
 }
 
+SECTION_APPENDICES = {
+    "## 1(a) Heston (1993) calibrated with the Lewis (2001) representation": r"""
+### Calibration procedure
+
+1. Retain exactly the five calls and five puts with 15 trading days to maturity and set $T=15/250=0.06$ years.
+2. For each trial parameter vector, evaluate calls from Equation (5) and derive puts from Equation (6), using the common spot and 1.50% risk-free rate.
+3. Minimize Equation (7) in dollar-price space. A seeded differential-evolution search first explores the bounded parameter region; bounded nonlinear least squares then refines the candidate using the ten individual residuals.
+4. Assess the result using MSE, RMSE, option-level residuals, put-call parity, parameter bounds, and the Feller diagnostic $2\kappa\theta-\sigma^2$. This separates numerical fit from data inconsistency and parameter-identification risk.
+""".strip(),
+    "## 1(b) Heston calibrated with Carr-Madan (1999)": r"""
+### Comparison procedure
+
+The maturity, observations, parameter bounds, parity convention, optimizer sequence, and unweighted MSE are held fixed. Only the Fourier pricing representation changes. This controlled design makes fitted prices, objective values, and direct same-parameter price differences valid numerical comparisons; parameter equality is a weaker criterion when the short-maturity objective is flat.
+""".strip(),
+    "## 1(c) Twenty-day ATM Asian call": r"""
+### Monte Carlo procedure
+
+The selected Heston calibration is simulated under the risk-neutral measure for 20 daily steps of $\Delta t=1/250$. Full truncation replaces negative Euler variance inputs by zero, correlated Gaussian shocks preserve the fitted leverage effect, and today's spot is included before the 20 simulated observations. The analysis uses 200,000 paths with a fixed seed, discounts every payoff at the risk-free rate, and reports both estimator uncertainty and the required commercial fee.
+""".strip(),
+    "## 2(a) Bates (1996) calibrated with Lewis (2001)": r"""
+### Calibration procedure
+
+The ten 60-day options are converted to $T=60/250=0.24$ years. The five Heston parameters and three jump parameters are estimated jointly by the same seeded global-search/local-refinement sequence and regular price MSE used in Step 1(a). Calls use the Lewis integral with the Bates characteristic function; puts use parity. Residual, parity, boundary, and Feller diagnostics are reviewed because adding jump flexibility does not make inconsistent quotes jointly attainable.
+""".strip(),
+    "## 2(b) Bates (1996) calibrated with Carr-Madan (1999)": r"""
+### Comparison procedure
+
+The Carr-Madan exercise changes only the numerical pricing transform. The 60-day sample, eight-parameter bounds, optimizer tolerances, parity construction, and objective remain unchanged. Similar MSE with different parameter vectors indicates weak identification or multiple near-minima; it does not by itself imply a pricing-engine error.
+""".strip(),
+    "## 3(a) CIR (1985) calibration to the Euribor term structure": r"""
+### Curve-construction and calibration procedure
+
+The five supplied annual rates are mapped to 7, 30, 90, 180, and 365 days. A natural cubic spline produces 52 weekly nodes from day 7 through day 364, with negative interpolated values floored at zero to remain consistent with CIR support. The one-week observation initializes the short rate. Differential evolution then minimizes the mean squared difference between the weekly spline and the continuously compounded CIR zero rates from Equations (19)-(23).
+""".strip(),
+    "## 3(b) One-year daily CIR simulation": r"""
+### Scenario procedure
+
+Starting from the calibrated initial rate, 100,000 paths are advanced through 250 daily steps with $\Delta t=1/250$ and a fixed random seed. Full truncation evaluates the square-root diffusion at the non-negative part of the current rate and floors terminal rates at zero. The 2.5th and 97.5th percentiles form the selected 95% range; the sample mean estimates the expected terminal rate.
+""".strip(),
+}
+
 
 def validate_function_call(source: str) -> str:
     """Validate and return one expression containing only a function invocation."""
@@ -106,16 +194,48 @@ def apply_presentation_markdown(notebook) -> None:
     markdown_cells = [cell for cell in notebook.cells if cell.cell_type == "markdown"]
     if not markdown_cells:
         raise ValueError("Notebook has no narrative cells.")
-    if NOTEBOOK_STYLE not in markdown_cells[0].source:
-        markdown_cells[0].source = f"{NOTEBOOK_STYLE}\n\n{markdown_cells[0].source}"
+    first_source = re.sub(
+        r"<!-- NOTEBOOK_THEME_START -->.*?<!-- NOTEBOOK_THEME_END -->\s*",
+        "",
+        markdown_cells[0].source,
+        flags=re.DOTALL,
+    )
+    first_source = re.sub(
+        r"<style>\s*/\* WQU presentation typography:.*?</style>\s*",
+        "",
+        first_source,
+        flags=re.DOTALL,
+    )
+    markdown_cells[0].source = f"{NOTEBOOK_STYLE}\n\n{first_source.lstrip()}"
 
     for anchor, explanation in MODEL_EXPLANATIONS.items():
         matching_cells = [cell for cell in markdown_cells if anchor in cell.source]
         if len(matching_cells) != 1:
             raise ValueError(f"Expected one markdown anchor for {anchor!r}.")
         cell = matching_cells[0]
-        if explanation not in cell.source:
-            cell.source = cell.source.replace(anchor, f"{anchor}\n\n{explanation}", 1)
+        styled_explanation = f"> {explanation}"
+        if styled_explanation not in cell.source:
+            if explanation in cell.source:
+                cell.source = cell.source.replace(explanation, styled_explanation, 1)
+            else:
+                cell.source = cell.source.replace(anchor, f"{anchor}\n\n{styled_explanation}", 1)
+
+    for anchor, appendix in SECTION_APPENDICES.items():
+        matching_cells = [cell for cell in markdown_cells if anchor in cell.source]
+        if len(matching_cells) != 1:
+            raise ValueError(f"Expected one markdown section for {anchor!r}.")
+        cell = matching_cells[0]
+        appendix_heading = appendix.splitlines()[0]
+        if appendix_heading not in cell.source:
+            cell.source = f"{cell.source.rstrip()}\n\n{appendix}"
+
+    for cell in markdown_cells:
+        cell.source = (
+            cell.source.replace(r"\[", "$$")
+            .replace(r"\]", "$$")
+            .replace(r"\(", "$")
+            .replace(r"\)", "$")
+        )
 
 
 def main() -> None:

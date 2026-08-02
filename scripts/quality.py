@@ -17,6 +17,7 @@ def main() -> None:
     run(python, "-m", "ruff", "format", "--check", "src", "tests", "scripts")
     run(python, "-m", "pytest")
     run(python, "scripts/validate_artifacts.py")
+    run(python, "scripts/check_notebook_rendering.py")
 
 
 if __name__ == "__main__":

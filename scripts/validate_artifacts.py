@@ -43,9 +43,11 @@ def main() -> None:
         for output in cell.get("outputs", [])
         if output.output_type == "error"
     ]
-    display_equations = re.findall(r"\\\[(.*?)\\\]", markdown_text, flags=re.DOTALL)
+    display_equations = re.findall(r"\$\$(.*?)\$\$", markdown_text, flags=re.DOTALL)
     assert display_equations, "notebook has no display equations"
+    assert len(display_equations) == 25
     assert all("\\tag{" in equation for equation in display_equations)
+    assert r"\[" not in markdown_text and r"\]" not in markdown_text
     equation_numbers = [int(number) for number in re.findall(r"\\tag\{(\d+)\}", markdown_text)]
     assert equation_numbers == list(range(1, 26))
     assert not any(character in markdown_text for character in ("\a", "\b", "\f", "\v"))
@@ -72,6 +74,23 @@ def main() -> None:
     ]
     assert len(plot_descriptions) == 8
     assert all("font-size: 8pt !important" in description for description in plot_descriptions)
+    discussion_headings = {
+        output.data["text/markdown"].splitlines()[0]
+        for cell in code_cells
+        for output in cell.get("outputs", [])
+        if output.output_type in ("display_data", "execute_result")
+        and "text/markdown" in output.data
+    }
+    assert discussion_headings == {
+        "#### Calibration discussion",
+        "#### Lewis versus Carr-Madan",
+        "#### Valuation and client recommendation",
+        "#### Bates calibration discussion",
+        "#### Bates pricing-method comparison",
+        "#### Pricing interpretation",
+        "#### CIR calibration discussion",
+        "#### Rate-scenario discussion",
+    }
     for citation in (
         "(Heston 327-343)",
         "(Carr and Madan 61-73)",
@@ -86,6 +105,7 @@ def main() -> None:
     assert "## works cited" in readme_text
     html_text = HTML.read_text(encoding="utf-8")
     assert html_text.count("plot-description") >= 8
+    assert "No description has been provided for this image" not in html_text
     for marker in ("from dataclasses", "def heston_cf", "differential_evolution"):
         assert marker not in html_text
     pdf = PdfReader(PDF)
