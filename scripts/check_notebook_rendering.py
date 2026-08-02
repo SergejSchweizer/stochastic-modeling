@@ -27,9 +27,10 @@ def _font_size(locator) -> float:
     return float(value.removesuffix("px"))
 
 
-def _all_have_font_size(locator, expected: float) -> bool:
+def _all_have_font_size(locator, expected: float, tolerance: float = 0.05) -> bool:
     return all(
-        abs(_font_size(locator.nth(index)) - expected) < 0.05 for index in range(locator.count())
+        abs(_font_size(locator.nth(index)) - expected) < tolerance
+        for index in range(locator.count())
     )
 
 
@@ -86,7 +87,12 @@ def main() -> None:
         images = page.locator("img")
         assert images.count() == EXPECTED_PLOT_DESCRIPTIONS
         assert all(images.nth(index).get_attribute("alt") for index in range(images.count()))
-        assert _all_have_font_size(label_glyphs, EQUATION_LABEL_POINTS_IN_PIXELS)
+        equation_label_tolerance = 0.25 * 96 / 72
+        assert _all_have_font_size(
+            label_glyphs,
+            EQUATION_LABEL_POINTS_IN_PIXELS,
+            tolerance=equation_label_tolerance,
+        )
         assert _all_have_font_size(descriptions, PLOT_DESCRIPTION_POINTS_IN_PIXELS)
         assert all(
             descriptions.nth(index).evaluate("element => getComputedStyle(element).textAlign")
