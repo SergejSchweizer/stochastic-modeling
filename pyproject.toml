@@ -58,6 +58,7 @@ ignore = ["E501"]
 [tool.coverage.run]
 branch = true
 source = ["stochastic_modeling"]
+omit = ["src/stochastic_modeling/notebook_runtime.py"]
 
 [tool.coverage.report]
 fail_under = 95

@@ -1,5 +1,6 @@
 """Validate the checked-in notebook, narrative sidecar, and presentation export."""
 
+import ast
 import re
 from pathlib import Path
 
@@ -22,6 +23,20 @@ def main() -> None:
     )
     assert code_cells, "notebook has no executable cells"
     assert all("hide-input" in cell.metadata.get("tags", []) for cell in code_cells)
+    assert all(cell.get("outputs") for cell in code_cells), (
+        "every notebook function call must have a captured output"
+    )
+    for cell in code_cells:
+        tree = ast.parse(cell.source)
+        assert len(tree.body) == 1, "each executable cell must contain one function call"
+        statement = tree.body[0]
+        assert isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call), (
+            "notebook implementation must be limited to function calls"
+        )
+        assert not any(
+            isinstance(node, (ast.Assign, ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Lambda))
+            for node in ast.walk(tree)
+        ), "notebook cells may not contain implementation statements"
     assert not [
         output
         for cell in code_cells
