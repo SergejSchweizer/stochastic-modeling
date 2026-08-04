@@ -33,6 +33,7 @@ PARTICIPANTS = [
     ("Opeyemi Waliyilah Oladipupo", "walylad@gmail.com"),
     ("Sergej Schweizer", "sergej.schweizer@gmail.com"),
 ]
+GROUP_NUMBER = "16855"
 
 PURPLE = colors.HexColor("#443B63")
 BLUE = colors.HexColor("#2E6E9E")
@@ -49,7 +50,7 @@ def _cover_overlay() -> PdfReader:
     layer.rect(168, 726, 115, 18, fill=True, stroke=False)
     layer.setFillColor(INK)
     layer.setFont("Helvetica-Bold", 11)
-    layer.drawString(218, 746, "1")
+    layer.drawString(218, 746, GROUP_NUMBER)
     layer.setFont("Helvetica", 9)
     layer.drawString(171, 730, "Not provided")
 

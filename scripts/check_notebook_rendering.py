@@ -10,7 +10,6 @@ HTML = ROOT / "outputs" / "MScFE622_GWP1.html"
 EXPECTED_EQUATIONS = [f"({number})" for number in range(1, 26)]
 EXPECTED_PLOT_DESCRIPTIONS = 9
 EQUATION_LABEL_POINTS_IN_PIXELS = 8 * 96 / 72
-PLOT_DESCRIPTION_POINTS_IN_PIXELS = 8 * 96 / 72
 NORMAL_TEXT_POINTS_IN_PIXELS = 10 * 96 / 72
 
 
@@ -66,7 +65,9 @@ def main() -> None:
         label_glyphs = labels.locator(".mjx-mstyle > .mjx-mrow")
         errors = page.locator(".MathJax_Error, mjx-merror")
         descriptions = page.locator(".plot-description")
-        paragraphs = page.locator(".jp-RenderedMarkdown p:not(.plot-description)")
+        paragraphs = page.locator(".jp-RenderedHTMLCommon p")
+        prose_paragraphs = page.locator(".jp-RenderedHTMLCommon p:not(.plot-description)")
+        discussion_paragraphs = page.locator(".jp-OutputArea-output.jp-RenderedMarkdown p")
         lists = page.locator(".jp-RenderedMarkdown ul, .jp-RenderedMarkdown ol")
         list_items = page.locator(".jp-RenderedMarkdown li")
         headings = page.locator(
@@ -93,7 +94,7 @@ def main() -> None:
             EQUATION_LABEL_POINTS_IN_PIXELS,
             tolerance=equation_label_tolerance,
         )
-        assert _all_have_font_size(descriptions, PLOT_DESCRIPTION_POINTS_IN_PIXELS)
+        assert _all_have_font_size(descriptions, NORMAL_TEXT_POINTS_IN_PIXELS)
         assert all(
             descriptions.nth(index).evaluate("element => getComputedStyle(element).textAlign")
             == "center"
@@ -106,6 +107,8 @@ def main() -> None:
         )
         assert paragraphs.count() > 0
         assert _all_have_normal_typography(paragraphs)
+        assert discussion_paragraphs.count() > 0
+        assert _all_have_normal_typography(discussion_paragraphs)
         assert list_items.count() > 0
         assert _all_have_normal_typography(list_items)
         assert lists.count() > 0
@@ -124,14 +127,16 @@ def main() -> None:
             for index in range(list_items.count())
         )
         assert all(
-            paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlign")
+            prose_paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlign")
             == "justify"
-            for index in range(paragraphs.count())
+            for index in range(prose_paragraphs.count())
         )
         assert all(
-            paragraphs.nth(index).evaluate("element => getComputedStyle(element).textAlignLast")
+            prose_paragraphs.nth(index).evaluate(
+                "element => getComputedStyle(element).textAlignLast"
+            )
             == "center"
-            for index in range(paragraphs.count())
+            for index in range(prose_paragraphs.count())
         )
         assert headings.count() > 0
         assert all(
@@ -156,7 +161,7 @@ def main() -> None:
 
     print(
         "Browser rendering checks passed: centered headings and tables, justified text, and "
-        "8 pt annotations."
+        "10 pt paragraphs with 8 pt equation labels."
     )
 
 

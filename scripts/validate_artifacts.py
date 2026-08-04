@@ -70,7 +70,7 @@ def main() -> None:
         equation_tag = rf"\tag*{{$\scriptstyle ({first_equation})$}}"
         assert markdown_text.index(label) < markdown_text.index(equation_tag)
     assert not any(character in markdown_text for character in ("\a", "\b", "\f", "\v"))
-    assert "font-size: 8pt !important" in markdown_text
+    assert "font-size: 10pt !important" in markdown_text
     for explanation_label in (
         "**Heston model purpose.**",
         "**Lewis representation purpose.**",
@@ -92,7 +92,7 @@ def main() -> None:
         and "plot-description" in output.data["text/html"]
     ]
     assert len(plot_descriptions) == 9
-    assert all("font-size: 8pt !important" in description for description in plot_descriptions)
+    assert all("plot-description" in description for description in plot_descriptions)
     assert [
         re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
         for description in plot_descriptions
@@ -142,6 +142,7 @@ def main() -> None:
     positions = [pdf_text.index(participant) for participant in participants]
     assert positions == sorted(positions)
     assert pdf.metadata.title == "Stochastic Modeling Group Work Project 1"
+    assert "16855" in pdf_text
     assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
     assert all(f"Plot {number}." in pdf_text for number in range(1, 10))
 
