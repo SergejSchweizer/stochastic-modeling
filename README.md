@@ -40,7 +40,7 @@ The standard error is 0.27% of fair value, so simulation noise is small relative
 
 ![100 randomly sampled Asian-call paths](outputs/figures/step1c_asian_paths.png)
 
-![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)
+![Asian-call fair-value convergence](outputs/figures/step1c_asian_distribution.png)
 
 ## Step 2 - 60-day derivative
 

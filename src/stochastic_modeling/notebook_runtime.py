@@ -70,7 +70,7 @@ def _calibrate(frame: pd.DataFrame, kind: str, method: str, seed: int):
 
 def _show_discussion(title: str, *paragraphs: str) -> None:
     """Render a concise, result-aware interpretation beneath an output."""
-    display(Markdown(f"#### {title}\n\n" + "\n\n".join(paragraphs)))
+    display(Markdown(f"### {title}\n\n" + "\n\n".join(paragraphs)))
 
 
 def initialize_workflow() -> None:
@@ -370,17 +370,47 @@ def show_asian_call_valuation() -> None:
         "Only 100 randomly selected SM Energy paths are shown from today's spot through the "
         "20-day Asian-option horizon; the valuation still uses all 200,000 paths.",
     )
+    running_fair_values = np.cumsum(context.asian_samples) / np.arange(
+        1, len(context.asian_samples) + 1
+    )
+    convergence_start = 1_000
+    evaluation_paths = np.unique(
+        np.linspace(convergence_start, len(context.asian_samples), num=2_000, dtype=int)
+    )
+    displayed_estimates = running_fair_values[evaluation_paths - 1]
+    y_min = min(displayed_estimates.min(), estimate.confidence_low) - 0.04
+    y_max = max(displayed_estimates.max(), estimate.confidence_high) + 0.04
     plt.figure(figsize=(8, 4.2))
-    plt.hist(context.asian_samples, bins=70, color="#4C78A8", alpha=0.85)
-    plt.axvline(context.asian_fair, color="#E45756", lw=2, label="Fair value")
-    plt.title("Step 1(iii): discounted Asian-call simulation outcomes")
-    plt.xlabel("Discounted payoff (USD)")
-    plt.ylabel("Frequency")
-    plt.legend()
+    plt.plot(
+        evaluation_paths,
+        displayed_estimates,
+        color="#4C78A8",
+        lw=1.3,
+        label="Running Monte Carlo estimate",
+    )
+    plt.axhspan(
+        estimate.confidence_low,
+        estimate.confidence_high,
+        color="#59A14F",
+        alpha=0.2,
+        label="Final 95% estimator interval",
+    )
+    plt.axhline(
+        context.asian_fair,
+        color="#E45756",
+        lw=2,
+        label=f"Fair value: ${context.asian_fair:.2f}",
+    )
+    plt.title("Step 1(iii): Monte Carlo convergence to Asian-call fair value")
+    plt.xlabel("Number of simulated paths")
+    plt.ylabel("Estimated discounted value (USD)")
+    plt.ylim(y_min, y_max)
+    plt.legend(loc="best")
     _save_figure(
         "step1c_asian_distribution.png",
-        "The histogram shows simulated discounted Asian-call payoffs; the vertical line marks "
-        "their mean, which is the estimated fair value.",
+        "After the initial 1,000 paths, the running Monte Carlo estimate converges to the "
+        "Asian-call fair value; the shaded band shows the final 95% estimator interval after "
+        "all 200,000 paths.",
     )
     _show_discussion(
         "Valuation and client recommendation",
@@ -390,10 +420,11 @@ def show_asian_call_valuation() -> None:
         f"${estimate.confidence_high:.4f} is narrow enough that simulation noise is immaterial "
         "relative to calibration and model risk. The path plot shows 100 randomly sampled "
         "daily trajectories, while all 200,000 paths remain in the valuation estimate. "
-        "The payoff histogram is right-skewed and "
-        "contains many zero or small outcomes because the call pays only when the arithmetic "
-        "average exceeds the strike. The vertical line is the probability-weighted mean of "
-        "those outcomes, not the most likely realized payoff.",
+        "The convergence chart makes the fair value directly visible: the running mean settles "
+        "inside the final 95% estimator interval as more paths are included. Many individual "
+        "payoffs are zero or small because the call pays only when the arithmetic average "
+        "exceeds the strike, which is why the fair value is a probability-weighted mean rather "
+        "than the most likely realized payoff.",
         f"**Client quote.** Applying the required 4% fee gives ${context.asian_client:.4f}. "
         "In plain language, the quote is based on many plausible daily price paths inferred "
         "from traded options; averaging prices dampens the effect of any single day's move. "
@@ -779,7 +810,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         "![100 randomly sampled Asian-call paths](outputs/figures/step1c_asian_paths.png)",
         "",
-        "![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)",
+        "![Asian-call fair-value convergence](outputs/figures/step1c_asian_distribution.png)",
         "",
         "## Step 2 - 60-day derivative",
         "",
