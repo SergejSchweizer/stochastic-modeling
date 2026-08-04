@@ -43,12 +43,16 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
     width: 100%;
     box-sizing: border-box;
 }
-.jp-RenderedHTMLCommon p:not(.plot-description),
+.jp-RenderedHTMLCommon p,
 .jp-RenderedHTMLCommon blockquote,
 .jp-RenderedHTMLCommon li,
 .jp-RenderedHTMLCommon table,
 .jp-RenderedHTMLCommon th,
-.jp-RenderedHTMLCommon td {
+.jp-RenderedHTMLCommon td,
+.jp-OutputArea-output.jp-RenderedMarkdown,
+.jp-OutputArea-output.jp-RenderedMarkdown p,
+.jp-OutputArea-output.jp-RenderedMarkdown li,
+.jp-OutputArea-output.jp-RenderedMarkdown blockquote {
     font-family: Arial, Calibri, sans-serif !important;
     font-size: 10pt !important;
     font-style: normal !important;
@@ -129,7 +133,7 @@ NOTEBOOK_STYLE = """<!-- NOTEBOOK_THEME_START -->
     font-size: 85.5% !important;
 }
 .jp-RenderedHTMLCommon p.plot-description {
-    font-size: 8pt !important;
+    font-size: 10pt !important;
   line-height: 1.3;
   color: #444;
   margin: 0.25rem 0 1rem;

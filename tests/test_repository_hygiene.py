@@ -37,7 +37,7 @@ def test_notebook_cells_are_call_only_and_have_outputs():
         )
 
 
-def test_notebook_has_numbered_eight_point_equation_and_plot_annotations():
+def test_notebook_has_numbered_equation_and_plot_annotations():
     root = Path(__file__).resolve().parents[1]
     notebook = nbformat.read(root / "notebooks" / "MScFE622_GWP1.ipynb", as_version=4)
     markdown = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "markdown")
@@ -51,13 +51,13 @@ def test_notebook_has_numbered_eight_point_equation_and_plot_annotations():
         and "plot-description" in output.data["text/html"]
     ]
 
-    assert "font-size: 8pt !important" in markdown
+    assert "font-size: 10pt !important" in markdown
     equations = re.findall(r"\$\$(.*?)\$\$", markdown, flags=re.DOTALL)
     assert len(equations) == 25
     assert all(r"\tag*{" in equation for equation in equations)
     assert r"\[" not in markdown and r"\]" not in markdown
     assert len(descriptions) == 9
-    assert all("font-size: 8pt !important" in description for description in descriptions)
+    assert all("plot-description" in description for description in descriptions)
     assert [
         re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
         for description in descriptions
@@ -97,4 +97,10 @@ def test_notebook_plot_four_contains_simulated_paths():
     image = mpimg.imread(BytesIO(base64.b64decode(plot_four_output.data["image/png"])))
     blue_path_pixels = image[..., 2] - image[..., 0] > 0.15
 
-    assert blue_path_pixels.mean() > 0.1
+    assert "Only 100 randomly selected" in next(
+        output.data["text/html"]
+        for output in plot_four_cell.outputs
+        if output.output_type in ("display_data", "execute_result")
+        and "plot-description" in output.data.get("text/html", "")
+    )
+    assert blue_path_pixels.mean() > 0.01

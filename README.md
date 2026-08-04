@@ -38,7 +38,7 @@ Today's spot is included in the arithmetic average, following the project instru
 
 The standard error is 0.27% of fair value, so simulation noise is small relative to calibration risk. The interval measures estimator precision and is not a guaranteed payoff range for the client.
 
-![All simulated Asian-call paths](outputs/figures/step1c_asian_paths.png)
+![100 randomly sampled Asian-call paths](outputs/figures/step1c_asian_paths.png)
 
 ![Asian-call outcome distribution](outputs/figures/step1c_asian_distribution.png)
 
