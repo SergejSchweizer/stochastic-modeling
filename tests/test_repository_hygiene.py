@@ -62,6 +62,7 @@ def test_notebook_has_numbered_equation_and_plot_annotations():
         re.search(r"<strong>Plot (\d+)\.</strong>", description).group(1)
         for description in descriptions
     ] == [str(number) for number in range(1, 10)]
+    assert "running Monte Carlo estimate converges" in descriptions[4]
 
     sub_exercise_headings = re.findall(r"^## ([123]\([^)]+\)) ", markdown, flags=re.MULTILINE)
     assert sub_exercise_headings == [

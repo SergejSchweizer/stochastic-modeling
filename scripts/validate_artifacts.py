@@ -105,14 +105,14 @@ def main() -> None:
         and "text/markdown" in output.data
     }
     assert discussion_headings == {
-        "#### Calibration discussion",
-        "#### Lewis versus Carr-Madan",
-        "#### Valuation and client recommendation",
-        "#### Bates calibration discussion",
-        "#### Bates pricing-method comparison",
-        "#### Pricing interpretation",
-        "#### CIR calibration discussion",
-        "#### Rate-scenario discussion",
+        "### Calibration discussion",
+        "### Lewis versus Carr-Madan",
+        "### Valuation and client recommendation",
+        "### Bates calibration discussion",
+        "### Bates pricing-method comparison",
+        "### Pricing interpretation",
+        "### CIR calibration discussion",
+        "### Rate-scenario discussion",
     }
     for citation in (
         "(Heston 327-343)",
@@ -142,6 +142,8 @@ def main() -> None:
     positions = [pdf_text.index(participant) for participant in participants]
     assert positions == sorted(positions)
     assert pdf.metadata.title == "Stochastic Modeling Group Work Project 1"
+    cover_text = pdf.pages[0].extract_text() or ""
+    assert re.search(r"\b1\s+16855\b", cover_text)
     assert "16855" in pdf_text
     assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
     assert all(f"Plot {number}." in pdf_text for number in range(1, 10))
