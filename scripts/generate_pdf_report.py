@@ -59,8 +59,6 @@ def _cover_overlay() -> PdfReader:
     for (name, email), y in zip(PARTICIPANTS, row_y, strict=True):
         layer.setFont("Helvetica", 7.5 if len(name) > 25 else 8.5)
         layer.drawString(76, y, name)
-        layer.setFont("Helvetica", 8.5)
-        layer.drawString(206, y, "Not provided")
         layer.setFont("Helvetica", 7.8)
         layer.drawString(346, y, email)
 
