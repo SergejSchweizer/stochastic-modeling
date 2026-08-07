@@ -134,6 +134,7 @@ def main() -> None:
     pdf = PdfReader(PDF)
     assert len(pdf.pages) >= 2
     pdf_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    normalized_pdf_text = " ".join(pdf_text.split())
     participants = [
         "Umuhoza Denyse Graine",
         "Opeyemi Waliyilah Oladipupo",
@@ -147,7 +148,20 @@ def main() -> None:
     assert "16855" in pdf_text
     assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
     assert all(f"Plot {number}." in pdf_text for number in range(1, 10))
-    assert all(f"Equation {number}\n" in pdf_text for number in range(1, 26))
+    plot_explanations = (
+        "remaining gaps reflect quote inconsistency",
+        "no single directional bias explains the errors",
+        "agreement in prices despite materially different calibrated parameters",
+        "highlighted median path gives a typical scenario",
+        "confidence band narrows as Monte Carlo uncertainty declines",
+        "limitations of fitting the inconsistent call-put cross-section",
+        "supporting numerical consistency across methods",
+        "small deviations summarized by the curve RMSE",
+        "zoom excludes only the highest 10% from view",
+    )
+    assert all(explanation in normalized_pdf_text for explanation in plot_explanations)
+    assert all(f"({number})" in pdf_text for number in range(1, 26))
+    assert not re.search(r"^Equation \d+$", pdf_text, flags=re.MULTILINE)
     section_equations = {
         "1(i) Heston calibration using Lewis (2001)": (
             "Heston represents equity returns",
@@ -188,9 +202,9 @@ def main() -> None:
         section_equations.items(), section_positions, section_ends, strict=True
     ):
         section_text = pdf_text[start:end]
-        assert all(f"Equation {number}\n" in section_text for number in equation_numbers), heading
+        assert all(f"({number})" in section_text for number in equation_numbers), heading
         assert section_text.index(introduction) < section_text.index(
-            f"Equation {equation_numbers.start}\n"
+            f"({equation_numbers.start})"
         ), heading
     assert "Model equations and parameter descriptions" not in pdf_text
     assert "Equation 1 description." not in pdf_text

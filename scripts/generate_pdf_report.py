@@ -11,7 +11,7 @@ import nbformat
 from matplotlib.mathtext import math_to_image
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -23,6 +23,8 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
     Spacer,
+    Table,
+    TableStyle,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -156,15 +158,14 @@ def _styles():
     )
     styles.add(
         ParagraphStyle(
-            name="EquationLabel",
+            name="EquationNumber",
             parent=styles["BodyReport"],
-            fontName="Helvetica-Bold",
-            fontSize=10,
-            leading=12,
-            textColor=BLUE,
-            alignment=TA_CENTER,
-            spaceBefore=6,
-            spaceAfter=4,
+            fontName="Helvetica",
+            fontSize=8,
+            leading=9,
+            textColor=colors.HexColor("#52616B"),
+            alignment=TA_RIGHT,
+            spaceAfter=0,
         )
     )
     styles.add(
@@ -270,15 +271,31 @@ def _equation_flowable(
     equation = Image(stream)
     scale = min(
         72 / 180,
-        (6.4 * inch) / equation.imageWidth,
+        (5.5 * inch) / equation.imageWidth,
         (1.05 * inch) / equation.imageHeight,
     )
     equation.drawWidth = equation.imageWidth * scale
     equation.drawHeight = equation.imageHeight * scale
-    equation.hAlign = "CENTER"
+    equation_row = Table(
+        [[Spacer(1, 1), equation, Paragraph(f"({number})", styles["EquationNumber"])]],
+        colWidths=[0.45 * inch, 5.5 * inch, 0.45 * inch],
+        hAlign="CENTER",
+    )
+    equation_row.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
     return [
-        Paragraph(f"Equation {number}", styles["EquationLabel"]),
-        equation,
+        equation_row,
         Spacer(1, 5),
     ]
 

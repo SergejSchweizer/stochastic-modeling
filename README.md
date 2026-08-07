@@ -16,9 +16,9 @@ The input quotes have a put-call parity RMSE of $0.9068; an arbitrage-consistent
 
 Initial variance implies 32.93% annualized volatility and rho=-0.9444 indicates a strong leverage effect. Theta is at its lower bound and the Feller diagnostic is -1.6170; the parameter vector should therefore be treated as a short-horizon fit rather than a long-run forecast.
 
-![15-day market and model prices](outputs/figures/step1a_market_vs_model.png)
+![15-day market and model prices. The fitted curves follow the market points closely for both calls and puts, while the remaining gaps reflect quote inconsistency and calibration error.](outputs/figures/step1a_market_vs_model.png)
 
-![15-day residuals](outputs/figures/step1a_residuals.png)
+![15-day residuals. Bars above zero indicate model overpricing and bars below zero indicate underpricing; the mix of signs shows that no single directional bias explains the errors.](outputs/figures/step1a_residuals.png)
 
 ### 1(ii) Carr-Madan comparison
 
@@ -28,7 +28,7 @@ The damped transform follows Carr and Madan (61-73). Its MSE is 0.2458, compared
 
 Kappa changes from 2.2032 under Lewis to 0.0504 under Carr-Madan even though the losses are identical to four decimals. This is consistent with weak short-maturity identification: the two numerical formulas agree on prices, while the optimizer can move along a flat parameter direction.
 
-![15-day Carr-Madan fit](outputs/figures/step1b_carr_madan_fit.png)
+![15-day Carr-Madan fit. The market points and fitted curves nearly reproduce the Lewis result, showing agreement in prices despite materially different calibrated parameters.](outputs/figures/step1b_carr_madan_fit.png)
 
 ### 1(iii) 20-day ATM Asian call
 
@@ -38,9 +38,9 @@ Today's spot is included in the arithmetic average, following the project instru
 
 The standard error is 0.27% of fair value, so simulation noise is small relative to calibration risk. The interval measures estimator precision and is not a guaranteed payoff range for the client.
 
-![100 randomly sampled Asian-call paths](outputs/figures/step1c_asian_paths.png)
+![100 randomly sampled Asian-call paths. The paths illustrate the range of simulated stock trajectories, the highlighted median path gives a typical scenario, and the strike line marks the payoff threshold.](outputs/figures/step1c_asian_paths.png)
 
-![Asian-call fair-value convergence](outputs/figures/step1c_asian_distribution.png)
+![Asian-call fair-value convergence. The running estimate settles near the final fair value as the number of paths increases, while the confidence band narrows as Monte Carlo uncertainty declines.](outputs/figures/step1c_asian_distribution.png)
 
 ## Step 2 - 60-day derivative
 
@@ -52,7 +52,7 @@ The 60-day jump-diffusion calibration follows Bates (69-107) and has MSE 1.3324 
 
 The call-put pairs have parity RMSE $2.2533. Rho is at its upper bound, theta and initial variance are at lower bounds, and jump volatility is at its lower bound. These boundary estimates and a Feller diagnostic of -0.0228 show that the eight parameters are weakly identified by this small, internally inconsistent cross-section.
 
-![60-day market and model prices](outputs/figures/step2a_market_vs_model.png)
+![60-day market and model prices. The Bates curves capture the overall strike pattern, but visible gaps between market points and model values show the limitations of fitting the inconsistent call-put cross-section.](outputs/figures/step2a_market_vs_model.png)
 
 ### 2(ii) Carr-Madan comparison
 
@@ -62,7 +62,7 @@ The matching Carr-Madan calibration follows Carr and Madan (61-73) and has MSE 1
 
 Jump intensity and mean jump size remain stable across methods, but kappa changes from 0.0114 to 14.9006. Nearly equal loss with very different mean reversion indicates a flat or multi-modal objective; fitted prices are more reliable than parameter equality.
 
-![60-day Carr-Madan fit](outputs/figures/step2b_carr_madan_fit.png)
+![60-day Carr-Madan fit. The transform-based fit reproduces the broad market-price shape and closely matches the Lewis pricing result, supporting numerical consistency across methods.](outputs/figures/step2b_carr_madan_fit.png)
 
 ### 2(iii) 70-day 95%-moneyness put
 
@@ -80,7 +80,7 @@ The supplied curve contains 0.648% (1 week), 0.679% (1 month), 1.173% (3 months)
 
 Mean reversion implies a half-life of 0.92 years, while the long-run rate 7.4170% lies above current 12-month Euribor. Curve RMSE is 7.90 basis points, but the Feller diagnostic -0.2063 is negative, so the process can reach zero and the broad dynamics remain uncertain.
 
-![Euribor curve and CIR fit](outputs/figures/step3a_cir_curve.png)
+![Euribor curve and CIR fit. Observed tenor points rise with maturity, and the CIR curve follows that upward term-structure shape while leaving small deviations summarized by the curve RMSE.](outputs/figures/step3a_cir_curve.png)
 
 ### 3(ii) One-year rate scenarios
 
@@ -90,7 +90,7 @@ Following the required simulation size (WorldQuant University 4), 100,000 daily 
 
 The expected rate is 167.3 basis points above today's 12-month quote. The distribution is strongly right-skewed: the lower endpoint is pinned at zero while the upper tail reaches high rates. Product effects are not universal because rates influence both discounting and risk-neutral drift; the CIR short rate is used here as a proxy for 12-month Euribor rather than a full multi-curve tenor model.
 
-![Zoomed terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)
+![Zoomed terminal Euribor distribution. The histogram concentrates near low rates and has a long right tail; the current-rate and expected-rate lines show the simulated upward shift, while the zoom excludes only the highest 10% from view.](outputs/figures/step3b_cir_distribution.png)
 
 ## Step 4 - Submission checklist
 
