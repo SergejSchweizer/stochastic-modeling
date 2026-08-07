@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from IPython.display import HTML, Image, Markdown, display
+from matplotlib.ticker import FuncFormatter
 
 from stochastic_modeling import (
     CalibrationService,
@@ -32,6 +33,15 @@ from stochastic_modeling import (
 )
 
 _WORKFLOW: SimpleNamespace | None = None
+
+NAVY = "#264A6E"
+BLUE = "#4C78A8"
+TEAL = "#3A8D78"
+CORAL = "#D95F59"
+GOLD = "#C8922E"
+INK = "#243447"
+GRID = "#D9E1E8"
+PANEL = "#FAFBFC"
 
 
 def _context() -> SimpleNamespace:
@@ -57,6 +67,58 @@ def _save_figure(name: str, description: str) -> None:
     )
 
 
+def _style_axis(axis, *, grid_axis: str = "y") -> None:
+    """Apply the shared publication style to a plot axis."""
+    axis.set_facecolor(PANEL)
+    axis.grid(True, axis=grid_axis, color=GRID, linewidth=0.8, alpha=0.85)
+    axis.set_axisbelow(True)
+    axis.spines["top"].set_visible(False)
+    axis.spines["right"].set_visible(False)
+    axis.spines["left"].set_color("#9AA8B5")
+    axis.spines["bottom"].set_color("#9AA8B5")
+    axis.tick_params(colors="#52616B", labelsize=9)
+    axis.xaxis.label.set_color(INK)
+    axis.yaxis.label.set_color(INK)
+    axis.title.set_color(INK)
+    axis.title.set_fontweight("semibold")
+    axis.title.set_ha("left")
+    axis.title.set_position((0, 1.0))
+
+
+def _plot_option_fit(frame: pd.DataFrame, model_label: str, maturity: str) -> None:
+    """Plot market and fitted call/put prices with consistent visual encoding."""
+    figure, axes = plt.subplots(1, 2, figsize=(11.5, 4.2))
+    for axis, option_type, option_name in zip(axes, ["C", "P"], ["Calls", "Puts"], strict=True):
+        data = frame.query("type == @option_type").sort_values("strike")
+        axis.scatter(
+            data.strike,
+            data.price,
+            s=58,
+            color=NAVY,
+            edgecolor="white",
+            linewidth=1,
+            zorder=3,
+            label="Market quote",
+        )
+        axis.plot(
+            data.strike,
+            data.model,
+            color=CORAL,
+            linewidth=2.4,
+            marker="o",
+            markersize=3.5,
+            label=model_label,
+        )
+        axis.set(
+            title=f"{maturity} {option_name}",
+            xlabel="Strike (USD)",
+            ylabel="Option price (USD)",
+        )
+        _style_axis(axis, grid_axis="both")
+        axis.legend(frameon=False, loc="best", fontsize=8.5)
+    figure.subplots_adjust(wspace=0.28)
+
+
 def _prices(frame: pd.DataFrame, model, method: str = "lewis") -> np.ndarray:
     context = _context()
     return model_prices(frame, model, context.pricers[method])
@@ -78,7 +140,24 @@ def initialize_workflow() -> None:
     global _WORKFLOW
 
     warnings.filterwarnings("ignore", category=RuntimeWarning)
-    sns.set_theme(style="whitegrid", context="notebook")
+    sns.set_theme(
+        style="whitegrid",
+        context="notebook",
+        rc={
+            "figure.facecolor": "white",
+            "axes.facecolor": PANEL,
+            "axes.edgecolor": "#9AA8B5",
+            "axes.labelcolor": INK,
+            "axes.titlecolor": INK,
+            "axes.titlesize": 12,
+            "axes.titleweight": "semibold",
+            "font.family": "DejaVu Sans",
+            "grid.color": GRID,
+            "grid.linewidth": 0.8,
+            "legend.frameon": False,
+            "savefig.facecolor": "white",
+        },
+    )
     root = Path.cwd()
     if not (root / "data").exists():
         root = root.parent
@@ -209,31 +288,36 @@ def show_heston_lewis_calibration() -> None:
 def show_heston_lewis_fit() -> None:
     """Display the 15-day fitted prices and residuals."""
     context = _context()
-    _, axes = plt.subplots(1, 2, figsize=(12, 4.2), sharey=False)
-    for axis, option_type, name in zip(axes, ["C", "P"], ["Calls", "Puts"], strict=True):
-        data = context.fitted_15.query("type == @option_type")
-        axis.plot(data.strike, data.price, "o", ms=7, label="Market")
-        axis.plot(data.strike, data.model, "-", lw=2, label="Heston-Lewis")
-        axis.set(title=f"15-day {name}", xlabel="Strike", ylabel="Option price (USD)")
-        axis.legend()
+    _plot_option_fit(context.fitted_15, "Heston-Lewis", "15-day")
     _save_figure(
         "step1a_market_vs_model.png",
         "Market quotes are shown as points and Heston-Lewis fitted prices as curves; their "
         "distance shows the quality of the joint call-and-put calibration.",
     )
 
-    plt.figure(figsize=(8, 4.2))
+    figure, axis = plt.subplots(figsize=(8.5, 4.3))
     sns.barplot(
         data=context.fitted_15,
         x="strike",
         y="residual",
         hue="type",
-        palette="Set2",
+        palette={"C": TEAL, "P": CORAL},
+        edgecolor="white",
+        linewidth=0.8,
+        errorbar=None,
+        ax=axis,
     )
-    plt.axhline(0, color="black", lw=1)
-    plt.title("Step 1(i): pricing residuals")
-    plt.xlabel("Strike")
-    plt.ylabel("Model - market (USD)")
+    axis.axhline(0, color=INK, lw=1.2)
+    axis.set(
+        title="Step 1(i): signed pricing residuals",
+        xlabel="Strike (USD)",
+        ylabel="Model minus market (USD)",
+    )
+    _style_axis(axis)
+    axis.legend(title=None, frameon=False, labels=["Call", "Put"])
+    for container in axis.containers:
+        axis.bar_label(container, fmt="%+.2f", fontsize=7.5, padding=2, color=INK)
+    figure.tight_layout()
     _save_figure(
         "step1a_residuals.png",
         "Signed pricing errors by strike and option type reveal where the calibrated model "
@@ -303,17 +387,7 @@ def show_heston_carr_madan_calibration() -> None:
     )
     fit = context.short.copy()
     fit["model"] = _prices(context.short, context.heston_cm_15, "carr_madan")
-    _, axes = plt.subplots(1, 2, figsize=(12, 4.2))
-    for axis, option_type in zip(axes, ["C", "P"], strict=True):
-        data = fit.query("type == @option_type")
-        axis.plot(data.strike, data.price, "o", label="Market")
-        axis.plot(data.strike, data.model, "-", lw=2, label="Heston-Carr-Madan")
-        axis.set(
-            title=f"15-day {option_type} prices",
-            xlabel="Strike",
-            ylabel="Option price (USD)",
-        )
-        axis.legend()
+    _plot_option_fit(fit, "Heston-Carr-Madan", "15-day")
     _save_figure(
         "step1b_carr_madan_fit.png",
         "The Carr-Madan calibration is compared with the same 15-day market quotes to verify "
@@ -350,21 +424,39 @@ def show_asian_call_valuation() -> None:
     displayed_path_indices = np.random.default_rng(2026).choice(
         context.asian_paths.shape[1], size=displayed_path_count, replace=False
     )
+    displayed_paths = context.asian_paths[:, displayed_path_indices]
     figure, axis = plt.subplots(figsize=(9, 4.8))
     axis.plot(
         path_days,
-        context.asian_paths[:, displayed_path_indices],
-        color="#4C78A8",
-        linewidth=0.7,
-        alpha=0.45,
+        displayed_paths,
+        color=BLUE,
+        linewidth=0.65,
+        alpha=0.22,
     )
+    axis.plot(
+        path_days,
+        np.median(displayed_paths, axis=1),
+        color=NAVY,
+        linewidth=2.4,
+        label="Median displayed path",
+    )
+    axis.axhline(
+        context.spot,
+        color=CORAL,
+        linestyle="--",
+        linewidth=1.5,
+        label="ATM strike",
+    )
+    path_padding = 0.04 * (displayed_paths.max() - displayed_paths.min())
     axis.set(
         xlim=(path_days[0], path_days[-1]),
-        ylim=(context.asian_paths.min(), context.asian_paths.max()),
+        ylim=(displayed_paths.min() - path_padding, displayed_paths.max() + path_padding),
         xlabel="Trading day",
         ylabel="SM Energy price (USD)",
         title="Step 1(iii): 100 randomly sampled Heston price paths",
     )
+    _style_axis(axis, grid_axis="both")
+    axis.legend(frameon=False, loc="upper left")
     _save_figure(
         "step1c_asian_paths.png",
         "Only 100 randomly selected SM Energy paths are shown from today's spot through the "
@@ -380,32 +472,45 @@ def show_asian_call_valuation() -> None:
     displayed_estimates = running_fair_values[evaluation_paths - 1]
     y_min = min(displayed_estimates.min(), estimate.confidence_low) - 0.04
     y_max = max(displayed_estimates.max(), estimate.confidence_high) + 0.04
-    plt.figure(figsize=(8, 4.2))
-    plt.plot(
+    figure, axis = plt.subplots(figsize=(8.5, 4.3))
+    axis.plot(
         evaluation_paths,
         displayed_estimates,
-        color="#4C78A8",
-        lw=1.3,
+        color=NAVY,
+        lw=1.5,
         label="Running Monte Carlo estimate",
     )
-    plt.axhspan(
+    axis.axhspan(
         estimate.confidence_low,
         estimate.confidence_high,
-        color="#59A14F",
-        alpha=0.2,
+        color=TEAL,
+        alpha=0.18,
         label="Final 95% estimator interval",
     )
-    plt.axhline(
+    axis.axhline(
         context.asian_fair,
-        color="#E45756",
+        color=CORAL,
         lw=2,
         label=f"Fair value: ${context.asian_fair:.2f}",
     )
-    plt.title("Step 1(iii): Monte Carlo convergence to Asian-call fair value")
-    plt.xlabel("Number of simulated paths")
-    plt.ylabel("Estimated discounted value (USD)")
-    plt.ylim(y_min, y_max)
-    plt.legend(loc="best")
+    axis.scatter(
+        [evaluation_paths[-1]],
+        [displayed_estimates[-1]],
+        s=48,
+        color=NAVY,
+        edgecolor="white",
+        zorder=4,
+    )
+    axis.set(
+        title="Step 1(iii): Monte Carlo convergence to Asian-call fair value",
+        xlabel="Number of simulated paths",
+        ylabel="Estimated discounted value (USD)",
+        ylim=(y_min, y_max),
+    )
+    axis.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+    _style_axis(axis)
+    axis.legend(frameon=False, loc="lower right")
+    figure.tight_layout()
     _save_figure(
         "step1c_asian_distribution.png",
         "After the initial 1,000 paths, the running Monte Carlo estimate converges to the "
@@ -467,17 +572,7 @@ def show_bates_lewis_calibration() -> None:
         ).round(6)
     )
     display(context.fit_bates_60.round(4))
-    _, axes = plt.subplots(1, 2, figsize=(12, 4.2))
-    for axis, option_type in zip(axes, ["C", "P"], strict=True):
-        data = context.fit_bates_60.query("type == @option_type")
-        axis.plot(data.strike, data.price, "o", label="Market")
-        axis.plot(data.strike, data.model, "-", lw=2, label="Bates-Lewis")
-        axis.set(
-            title=f"60-day {option_type} prices",
-            xlabel="Strike",
-            ylabel="Option price (USD)",
-        )
-        axis.legend()
+    _plot_option_fit(context.fit_bates_60, "Bates-Lewis", "60-day")
     _save_figure(
         "step2a_market_vs_model.png",
         "Observed 60-day option prices are compared with Bates-Lewis values, showing the fit "
@@ -559,17 +654,7 @@ def show_bates_carr_madan_calibration() -> None:
     )
     fit = context.medium.copy()
     fit["model"] = _prices(context.medium, context.bates_60_cm, "carr_madan")
-    _, axes = plt.subplots(1, 2, figsize=(12, 4.2))
-    for axis, option_type in zip(axes, ["C", "P"], strict=True):
-        data = fit.query("type == @option_type")
-        axis.plot(data.strike, data.price, "o", label="Market")
-        axis.plot(data.strike, data.model, "-", lw=2, label="Bates-Carr-Madan")
-        axis.set(
-            title=f"60-day {option_type} prices",
-            xlabel="Strike",
-            ylabel="Option price (USD)",
-        )
-        axis.legend()
+    _plot_option_fit(fit, "Bates-Carr-Madan", "60-day")
     _save_figure(
         "step2b_carr_madan_fit.png",
         "The Bates-Carr-Madan curves are plotted against the 60-day quotes as a numerical "
@@ -652,20 +737,40 @@ def show_cir_calibration() -> None:
             ]
         ).round(8)
     )
-    plt.figure(figsize=(9, 4.5))
-    plt.plot(weekly_days, market_rates * 100, label="Cubic-spline Euribor curve", lw=2)
-    plt.plot(weekly_days, fitted_rates * 100, "--", label="CIR fitted curve", lw=2)
-    plt.scatter(
+    figure, axis = plt.subplots(figsize=(9, 4.5))
+    axis.plot(
+        weekly_days,
+        market_rates * 100,
+        color=NAVY,
+        label="Cubic-spline Euribor curve",
+        lw=2.4,
+    )
+    axis.plot(
+        weekly_days,
+        fitted_rates * 100,
+        color=CORAL,
+        linestyle="--",
+        label="CIR fitted curve",
+        lw=2.2,
+    )
+    axis.scatter(
         context.tenor_days,
         context.euribor * 100,
-        color="black",
-        zorder=3,
+        s=58,
+        color=GOLD,
+        edgecolor="white",
+        linewidth=1,
+        zorder=4,
         label="Supplied rates",
     )
-    plt.xlabel("Maturity (days)")
-    plt.ylabel("Annualized zero rate (%)")
-    plt.title("Step 3(i): Euribor term structure and CIR fit")
-    plt.legend()
+    axis.set(
+        xlabel="Maturity (days)",
+        ylabel="Annualized zero rate (%)",
+        title="Step 3(i): Euribor term structure and CIR fit",
+    )
+    _style_axis(axis, grid_axis="both")
+    axis.legend(frameon=False, loc="upper left")
+    figure.tight_layout()
     _save_figure(
         "step3a_cir_curve.png",
         "Supplied Euribor tenors, the weekly interpolated curve, and the fitted CIR curve show "
@@ -698,14 +803,19 @@ def show_cir_scenarios() -> None:
     """Simulate and display the one-year CIR terminal-rate distribution."""
     context = _context()
     context.cir_terminal = simulate_cir_terminal(context.cir_model, context.r0)
+    lower, first_quartile, median, third_quartile, upper = np.quantile(
+        context.cir_terminal, [0.025, 0.25, 0.5, 0.75, 0.975]
+    )
+    expected_rate = context.cir_terminal.mean()
+    current_rate = context.euribor[-1]
     summary = pd.DataFrame(
         [
             {
                 "paths": len(context.cir_terminal),
-                "current 12M Euribor": context.euribor[-1],
-                "expected 12M rate in one year": context.cir_terminal.mean(),
-                "95% lower bound": np.quantile(context.cir_terminal, 0.025),
-                "95% upper bound": np.quantile(context.cir_terminal, 0.975),
+                "current 12M Euribor": current_rate,
+                "expected 12M rate in one year": expected_rate,
+                "95% lower bound": lower,
+                "95% upper bound": upper,
             }
         ]
     )
@@ -720,35 +830,59 @@ def show_cir_scenarios() -> None:
             }
         )
     )
-    plt.figure(figsize=(8, 4.2))
-    plt.hist(context.cir_terminal * 100, bins=80, color="#59A14F", alpha=0.85)
-    plt.axvline(
-        context.cir_terminal.mean() * 100,
-        color="#E15759",
-        lw=2,
-        label="Expected terminal rate",
+    terminal_rates = context.cir_terminal * 100
+    zoom_lower = terminal_rates.min()
+    zoom_upper = np.quantile(terminal_rates, 0.90)
+    zoomed_rates = terminal_rates[terminal_rates <= zoom_upper]
+    figure, axis = plt.subplots(figsize=(8, 4.2))
+    axis.hist(
+        zoomed_rates,
+        bins=70,
+        color=TEAL,
+        edgecolor="white",
+        linewidth=0.35,
+        alpha=0.88,
     )
-    plt.xlabel("12-month Euribor in one year (%)")
-    plt.ylabel("Frequency")
-    plt.title("Step 3(ii): 100,000 simulated terminal Euribor rates")
-    plt.legend()
+    axis.axvline(
+        expected_rate * 100,
+        color=CORAL,
+        lw=2.2,
+        label=f"Expected terminal rate: {expected_rate:.2%}",
+    )
+    axis.axvline(
+        current_rate * 100,
+        color=BLUE,
+        lw=2,
+        linestyle="--",
+        label=f"Current 12M Euribor: {current_rate:.2%}",
+    )
+    axis.set_xlim(zoom_lower, zoom_upper)
+    axis.set_xlabel("12-month Euribor in one year (%)")
+    axis.set_ylabel("Frequency")
+    axis.set_title("Step 3(ii): terminal Euribor distribution (lower 90% shown)")
+    _style_axis(axis)
+    axis.legend(frameon=False, loc="upper right")
+    figure.tight_layout()
     _save_figure(
         "step3b_cir_distribution.png",
-        "The histogram summarizes 100,000 simulated one-year terminal rates; the vertical line "
-        "marks the expected terminal Euribor rate.",
+        "The histogram zooms in on the lower 90% of 100,000 simulated terminal rates; the "
+        "solid line marks the expected terminal rate and the dashed line marks current "
+        "12-month Euribor. All simulated paths remain included in the reported statistics.",
     )
-    expected_change_bps = (context.cir_terminal.mean() - context.euribor[-1]) * 10_000
-    lower, upper = np.quantile(context.cir_terminal, [0.025, 0.975])
+    expected_change_bps = (expected_rate - current_rate) * 10_000
     _show_discussion(
         "Rate-scenario discussion",
         f"**Distribution.** Expected one-year terminal rate "
-        f"{context.cir_terminal.mean():.4%} is {expected_change_bps:.1f} basis points above "
-        f"current 12-month Euribor {context.euribor[-1]:.4%}. The selected 95% interval is "
+        f"{expected_rate:.4%} is {expected_change_bps:.1f} basis points above "
+        f"current 12-month Euribor {current_rate:.4%}. The selected 95% interval is "
         f"{lower:.4%} to {upper:.4%}. Its zero lower endpoint and long upper tail follow from "
         "the non-negative square-root process combined with high fitted volatility. The mean "
-        "sits to the right of the histogram's most concentrated region because relatively rare "
-        "high-rate scenarios pull the arithmetic average upward; the interval is a model-based "
-        "scenario range, not a confidence interval for the estimated mean.",
+        f"of {expected_rate:.4%} sits to the right of the median of {median:.4%} and the middle "
+        f"50% range of {first_quartile:.4%} to {third_quartile:.4%} because relatively rare "
+        "high-rate scenarios pull the arithmetic average upward. The histogram is zoomed to "
+        "the lower 90% to make the main concentration visible; the upper 10% remains included "
+        "in every statistic. The reported 95% range is model-based, not a confidence interval "
+        "for the estimated mean.",
         "**Pricing implication.** If higher rates feed into the future discount curve, the "
         "present value of fixed positive cash flows falls and financing assumptions change. "
         "Option values move through both discounting and risk-neutral drift, so the direction "
@@ -860,7 +994,7 @@ def refresh_narrative_sidecar() -> None:
         "",
         f"The expected rate is {(context.cir_terminal.mean() - context.euribor[-1]) * 10_000:.1f} basis points above today's 12-month quote. The distribution is strongly right-skewed: the lower endpoint is pinned at zero while the upper tail reaches high rates. Product effects are not universal because rates influence both discounting and risk-neutral drift; the CIR short rate is used here as a proxy for 12-month Euribor rather than a full multi-curve tenor model.",
         "",
-        "![Terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)",
+        "![Zoomed terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)",
         "",
         "## Step 4 - Submission checklist",
         "",
