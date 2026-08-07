@@ -147,6 +147,66 @@ def main() -> None:
     assert "16855" in pdf_text
     assert "code" not in pdf_text.lower() and "notebook" not in pdf_text.lower()
     assert all(f"Plot {number}." in pdf_text for number in range(1, 10))
+    assert all(f"Equation {number}\n" in pdf_text for number in range(1, 26))
+    section_equations = {
+        "1(i) Heston calibration using Lewis (2001)": (
+            "Heston represents equity returns",
+            range(1, 8),
+        ),
+        "1(ii) Carr-Madan comparison": (
+            "Carr-Madan damps the option-price function",
+            range(8, 10),
+        ),
+        "1(iii) 20-day ATM Asian call": (
+            "The arithmetic-average Asian payoff",
+            range(10, 14),
+        ),
+        "2(i) Bates calibration using Lewis": (
+            "Bates extends Heston",
+            range(14, 17),
+        ),
+        "2(ii) Carr-Madan comparison": (
+            "This specification retains the Bates jump",
+            range(8, 10),
+        ),
+        "2(iii) 70-day 95%-moneyness put": (
+            "The project specifies a strike",
+            range(17, 18),
+        ),
+        "3(i) CIR calibration": (
+            "CIR models a non-negative",
+            range(18, 24),
+        ),
+        "3(ii) One-year rate scenarios": (
+            "Daily CIR simulation turns",
+            range(24, 26),
+        ),
+    }
+    section_positions = [pdf_text.index(heading) for heading in section_equations]
+    section_ends = section_positions[1:] + [pdf_text.index("Works Cited")]
+    for (heading, (introduction, equation_numbers)), start, end in zip(
+        section_equations.items(), section_positions, section_ends, strict=True
+    ):
+        section_text = pdf_text[start:end]
+        assert all(f"Equation {number}\n" in section_text for number in equation_numbers), heading
+        assert section_text.index(introduction) < section_text.index(
+            f"Equation {equation_numbers.start}\n"
+        ), heading
+    assert "Model equations and parameter descriptions" not in pdf_text
+    assert "Equation 1 description." not in pdf_text
+    for parameter_label in (
+        "Parameters (Equations 1-3).",
+        "Parameters (Equation 4).",
+        "Parameters (Equations 5-6).",
+        "Parameters (Equation 7).",
+        "Parameters (Equations 8-9).",
+        "Parameters (Equations 10-13).",
+        "Parameters (Equations 14-16).",
+        "Parameters (Equation 17).",
+        "Parameters (Equations 18-23).",
+        "Parameters (Equations 24-25).",
+    ):
+        assert parameter_label in pdf_text
 
 
 if __name__ == "__main__":

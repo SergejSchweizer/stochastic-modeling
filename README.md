@@ -90,7 +90,7 @@ Following the required simulation size (WorldQuant University 4), 100,000 daily 
 
 The expected rate is 167.3 basis points above today's 12-month quote. The distribution is strongly right-skewed: the lower endpoint is pinned at zero while the upper tail reaches high rates. Product effects are not universal because rates influence both discounting and risk-neutral drift; the CIR short rate is used here as a proxy for 12-month Euribor rather than a full multi-curve tenor model.
 
-![Terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)
+![Zoomed terminal Euribor distribution](outputs/figures/step3b_cir_distribution.png)
 
 ## Step 4 - Submission checklist
 

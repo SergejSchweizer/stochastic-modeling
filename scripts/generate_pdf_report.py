@@ -7,6 +7,8 @@ from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import nbformat
+from matplotlib.mathtext import math_to_image
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
@@ -26,6 +28,7 @@ from reportlab.platypus import (
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "docs" / "report-template.pdf"
 README = ROOT / "README.md"
+NOTEBOOK = ROOT / "notebooks" / "MScFE622_GWP1.ipynb"
 OUTPUT = ROOT / "outputs" / "pdf" / "Stochastic_Modeling_GWP1.pdf"
 
 PARTICIPANTS = [
@@ -40,6 +43,17 @@ PURPLE = colors.HexColor("#443B63")
 BLUE = colors.HexColor("#2E6E9E")
 INK = colors.HexColor("#26323D")
 LIGHT = colors.HexColor("#EEF3F7")
+
+SECTION_EQUATIONS = {
+    "1(i)": range(1, 8),
+    "1(ii)": range(8, 10),
+    "1(iii)": range(10, 14),
+    "2(i)": range(14, 17),
+    "2(ii)": range(8, 10),
+    "2(iii)": range(17, 18),
+    "3(i)": range(18, 24),
+    "3(ii)": range(24, 26),
+}
 
 
 def _cover_overlay() -> PdfReader:
@@ -142,6 +156,28 @@ def _styles():
     )
     styles.add(
         ParagraphStyle(
+            name="EquationLabel",
+            parent=styles["BodyReport"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            textColor=BLUE,
+            alignment=TA_CENTER,
+            spaceBefore=6,
+            spaceAfter=4,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="EquationDescription",
+            parent=styles["BodyReport"],
+            fontSize=9,
+            leading=12,
+            spaceAfter=10,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
             name="BulletReport",
             parent=styles["BodyReport"],
             leftIndent=14,
@@ -150,6 +186,130 @@ def _styles():
         )
     )
     return styles
+
+
+def _equation_references() -> list[tuple[int, str, str]]:
+    """Extract each tagged equation and its parameter description from the notebook."""
+    notebook = nbformat.read(NOTEBOOK, as_version=4)
+    markdown = "\n\n".join(cell.source for cell in notebook.cells if cell.cell_type == "markdown")
+    description_pattern = re.compile(
+        r"\*\*Parameters \(Equation(?:s)? (?P<start>\d+)"
+        r"(?:-(?P<end>\d+))?\)\.\*\*\s*(?P<description>.*?)(?=\n\s*\n)",
+        flags=re.DOTALL,
+    )
+    descriptions: dict[int, str] = {}
+    for match in description_pattern.finditer(markdown):
+        start = int(match.group("start"))
+        end = int(match.group("end") or start)
+        description = " ".join(match.group("description").split())
+        descriptions.update({number: description for number in range(start, end + 1)})
+
+    equation_pattern = re.compile(
+        r"\$\$\s*(?P<latex>.*?)\s*"
+        r"\\tag\*\{\$\\scriptstyle \((?P<number>\d+)\)\$\}\s*\$\$",
+        flags=re.DOTALL,
+    )
+    references = [
+        (
+            int(match.group("number")),
+            " ".join(match.group("latex").split()),
+            descriptions[int(match.group("number"))],
+        )
+        for match in equation_pattern.finditer(markdown)
+    ]
+    if [number for number, _, _ in references] != list(range(1, 26)):
+        raise ValueError("notebook must contain described equations numbered 1 through 25")
+    return references
+
+
+def _plain_description(description: str) -> str:
+    """Convert inline mathematical markup into readable PDF text."""
+    replacements = {
+        r"\widehat{\mathbb{E}}": "estimated E",
+        r"\mathbb{E}": "E",
+        r"\mathbb{Q}": "Q",
+        r"\operatorname{MSE}": "MSE",
+        r"\operatorname{Re}": "Re",
+        r"\sqrt{-1}": "sqrt(-1)",
+        r"\Theta": "Theta",
+        r"\kappa": "kappa",
+        r"\theta": "theta",
+        r"\sigma": "sigma",
+        r"\rho": "rho",
+        r"\varphi": "phi",
+        r"\phi": "phi",
+        r"\alpha": "alpha",
+        r"\lambda": "lambda",
+        r"\mu": "mu",
+        r"\delta": "delta",
+        r"\eta": "eta",
+        r"\gamma": "gamma",
+        r"\pi": "pi",
+        r"\Delta": "Delta",
+        r"\exp": "exp",
+        r"\log": "log",
+        r"\cdot": "dot",
+    }
+    text = description.replace("**", "").replace("$", "")
+    for source, replacement in replacements.items():
+        text = text.replace(source, replacement)
+    text = re.sub(r"\\(?:mathrm|text)\{([^{}]+)\}", r"\1", text)
+    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
+    text = text.replace(r"\!", "").replace(r"\,", " ")
+    return escape(text.replace("{", "").replace("}", ""))
+
+
+def _equation_flowable(
+    number: int,
+    latex: str,
+    styles,
+) -> list:
+    stream = BytesIO()
+    math_to_image(f"${latex}$", stream, dpi=180, format="png", color="#26323D")
+    stream.seek(0)
+    equation = Image(stream)
+    scale = min(
+        72 / 180,
+        (6.4 * inch) / equation.imageWidth,
+        (1.05 * inch) / equation.imageHeight,
+    )
+    equation.drawWidth = equation.imageWidth * scale
+    equation.drawHeight = equation.imageHeight * scale
+    equation.hAlign = "CENTER"
+    return [
+        Paragraph(f"Equation {number}", styles["EquationLabel"]),
+        equation,
+        Spacer(1, 5),
+    ]
+
+
+def _section_equation_story(section: str, styles) -> list:
+    references = {
+        number: (latex, description) for number, latex, description in _equation_references()
+    }
+    groups: list[list[tuple[int, str, str]]] = []
+    for number in SECTION_EQUATIONS[section]:
+        latex, description = references[number]
+        if not groups or groups[-1][-1][2] != description:
+            groups.append([])
+        groups[-1].append((number, latex, description))
+
+    story = []
+    for group in groups:
+        numbers = [number for number, _, _ in group]
+        equation_word = "Equation" if len(numbers) == 1 else "Equations"
+        number_label = str(numbers[0]) if len(numbers) == 1 else f"{numbers[0]}-{numbers[-1]}"
+        flowables = [
+            Paragraph(
+                f"<b>Parameters ({equation_word} {number_label}).</b> "
+                f"{_plain_description(group[0][2])}",
+                styles["EquationDescription"],
+            )
+        ]
+        for number, latex, _ in group:
+            flowables.extend(_equation_flowable(number, latex, styles))
+        story.append(KeepTogether(flowables))
+    return story
 
 
 def _image_flowable(path: Path, caption: str, caption_style: ParagraphStyle):
@@ -169,6 +329,7 @@ def _report_story():
     story = []
     skipping_submission = False
     plot_number = 0
+    pending_equation_section = None
     image_pattern = re.compile(r"!\[(?P<caption>.+)]\((?P<path>.+)\)")
     lines = README.read_text(encoding="utf-8").splitlines()
 
@@ -185,6 +346,7 @@ def _report_story():
             # The supplied template is the title and integrity page.
             continue
         if line.startswith("## "):
+            pending_equation_section = None
             if story:
                 story.append(PageBreak())
             story.append(Paragraph(escape(line[3:]), styles["Section"]))
@@ -193,6 +355,12 @@ def _report_story():
             if line.startswith("### 3(ii)"):
                 story.append(PageBreak())
             story.append(Paragraph(escape(line[4:]), styles["Question"]))
+            section_match = re.match(r"### (?P<section>[123]\([^)]+\))", line)
+            pending_equation_section = (
+                section_match.group("section")
+                if section_match and section_match.group("section") in SECTION_EQUATIONS
+                else None
+            )
             continue
         image_match = image_pattern.fullmatch(line)
         if image_match:
@@ -213,6 +381,9 @@ def _report_story():
             continue
         line = line.replace("This companion presents", "This report presents")
         story.append(Paragraph(escape(line), styles["BodyReport"]))
+        if pending_equation_section:
+            story.extend(_section_equation_story(pending_equation_section, styles))
+            pending_equation_section = None
     return story
 
 
